@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:03,800
+Ben öyle bir insan mıyım?
+
+2
+00:00:04,000 --> 00:00:07,800
+Öyle bir insan değilim, ama öğreniyorum.
+
+3
+00:00:08,000 --> 00:00:11,800
+Bir kelime daha söyle.
+
+4
+00:00:12,000 --> 00:00:15,800
+Gelecekteki üç satır burada.

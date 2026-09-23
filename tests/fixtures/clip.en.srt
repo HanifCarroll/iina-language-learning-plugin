@@ -1,0 +1,11 @@
+1
+00:00:00,000 --> 00:00:05,800
+Am I that kind of person?
+
+2
+00:00:06,000 --> 00:00:10,800
+I am learning.
+
+3
+00:00:11,000 --> 00:00:15,800
+The next lines are here.
