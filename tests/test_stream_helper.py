@@ -58,8 +58,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        if self.path == "/unauth":
-            self.send_response(401)
+        if self.path in ("/unauth", "/forbidden"):
+            self.send_response(401 if self.path == "/unauth" else 403)
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
@@ -79,7 +79,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.wfile.flush()
             return
         if self.path == "/interrupted":
-            self.connection.close()
+            self.wfile.write(b'data: {"choices":[{"delta":{"content":"partial"}}]}\n\n')
+            self.wfile.flush()
+            self.close_connection = True
             return
         if self.path == "/slow-first":
             return
@@ -188,6 +190,7 @@ class HelperTest(unittest.TestCase):
             (self.url("/redirect-other"), "ERROR redirect_blocked"),
             (self.url("/redirect-get"), "ERROR redirect_blocked"),
             (self.url("/unauth"), "ERROR http_401"),
+            (self.url("/forbidden"), "ERROR http_403"),
             (self.url("/rate-limit"), "ERROR http_429"),
             (self.url("/outage"), "ERROR http_503"),
             (self.url("/invalid"), "ERROR invalid_sse"),
@@ -234,6 +237,21 @@ class HelperTest(unittest.TestCase):
         self.assertEqual(lines[-1], "ERROR idle_timeout")
         lines, _ = self.run_helper(self.url("/slow-idle"), timeouts={"totalMs": 700})
         self.assertEqual(lines[-1], "ERROR total_timeout")
+
+    def test_interrupted_stream_reports_failure_after_partial_output(self):
+        lines, _ = self.run_helper(self.url("/interrupted"))
+        self.assertEqual(lines[-1], "ERROR interrupted")
+        self.assertTrue(any(line.startswith("DELTA ") for line in lines))
+
+    def test_unopened_request_pipe_times_out_and_cleans_up(self):
+        with tempfile.TemporaryDirectory() as parent:
+            directory = pathlib.Path(parent) / "request"
+            with subprocess.Popen([str(BINARY), str(directory)], stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE, text=True) as process:
+                self.assertEqual(process.stdout.readline().strip(), "READY")
+                self.assertEqual(process.stdout.readline().strip(), "ERROR request_timeout")
+                self.assertNotEqual(process.wait(timeout=3), 0)
+                self.assertFalse(directory.exists())
 
 
 if __name__ == "__main__":

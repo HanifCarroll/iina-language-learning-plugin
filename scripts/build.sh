@@ -9,5 +9,6 @@ bun build src/main.ts --target browser --format iife --outfile "$package/main.js
 bun build ui/overlay.ts --target browser --format iife --outfile "$package/ui/overlay.js" >/dev/null
 bun build ui/sidebar.ts --target browser --format iife --outfile "$package/ui/sidebar.js" >/dev/null
 cp Info.json "$package/Info.json"
+cp LICENSE "$package/LICENSE"
 cp ui/overlay.html ui/overlay.css ui/sidebar.html ui/sidebar.css "$package/ui/"
 printf '%s\n' "$package"

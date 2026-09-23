@@ -1,8 +1,8 @@
 # IINA Language Learning — MVP Specification
 
 **Version:** 0.1 · **Date:** September 23, 2026  
-**Status:** Behavior source of truth. The owner approved the architecture and remaining implementation after the installed-IINA integration milestone. Historical Phase 0 evidence remains in [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) and [INTEGRATION_MILESTONE.md](../INTEGRATION_MILESTONE.md); outstanding product checks are listed below.
-**Working title:** IINA Language Learning. Final project name and plugin identifier are not yet chosen.
+**Status:** Behavior source of truth. The owner approved the architecture and remaining implementation after the installed-IINA integration milestone. Historical Phase 0 evidence remains in [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) and [INTEGRATION_MILESTONE.md](../INTEGRATION_MILESTONE.md). Current product test results and outstanding checks are in [ACCEPTANCE_REPORT.md](../ACCEPTANCE_REPORT.md).
+**Project name:** IINA Language Learning. The local plugin identifier is `io.github.hanifcarroll.iina-language-learning`.
 
 ## 1. Product intent
 
@@ -47,7 +47,7 @@ These settle edge cases for the MVP; they are not additional features requested 
 - Closing a conversation means returning to playback of the **same playable media**, including when it was already paused before Explain. Never start a different file or restart ended/stopped playback as a side effect.
 - Closing the panel may retain its most recent conversation in memory for reopening in that player window; there is no history list. A new Explain action, media change, or window close clears it.
 - The built-in learner brief assumes a beginner in the configured source language, with grammatical terminology briefly explained. Do not embed the owner's personal biography or presume every user knows Spanish.
-- The approved TypeScript/DOM architecture and packaged Swift helper are recorded in `IMPLEMENTATION_PLAN.md`. An optional shortcut, final identifier, and release license remain engineering/release decisions, not reasons to reopen the settled product choices.
+- The approved TypeScript/DOM architecture and packaged Swift helper are recorded in `IMPLEMENTATION_PLAN.md`. The local plugin identifier and MIT source license are recorded there; any release decision remains separate.
 
 ## 3. Scope boundaries
 
@@ -323,7 +323,7 @@ Build and verify in thin local commits:
 4. Initial explanation, follow-ups, cancellation, close/resume, and lifecycle isolation.
 5. Error handling, UI verification, packaging, installation and contributor documentation.
 
-A phase may be reordered for implementation dependencies. Streaming feasibility has already been demonstrated in a packaged installed-IINA harness; production integration and the remaining acceptance matrix are still required.
+The production modules are implemented locally. Current product evidence and the remaining native acceptance checks are recorded in [ACCEPTANCE_REPORT.md](../ACCEPTANCE_REPORT.md).
 
 **Done means:** the required acceptance scenarios have evidence; limitations and tested versions are explicit; TypeScript/tests/build pass; a clean checkout produces an installable plugin; a real-Mac smoke test covers the whole loop with a configured provider; no secrets or user media appear in the repository; attribution is correct; and the owner can watch, select, learn, converse, and resume.
 

@@ -165,3 +165,43 @@ test('subtitle mismatch restores native source and a later match reclaims it', (
   expect(player.states.at(-1).status).toBe('Select a subtitle phrase to begin.');
   player.close();
 });
+
+test('request contains frozen neighboring and secondary context, with no key on keyless endpoint', () => {
+  const player = fakePlayer();
+  player.overlay.get('explain')!(select(player));
+  player.frames[0]('READY\n'); player.tick();
+  const request = player.writes.find(value => value.includes('/request:'))!;
+  const payload = JSON.parse(request.slice(request.indexOf('/request:') + 9));
+  expect(payload.key).toBeNull();
+  expect(payload.url).toBe('http://127.0.0.1:47891/chat/completions');
+  const prompt = JSON.parse(payload.body.messages[1].content);
+  expect(prompt.selected).toBe('öyle');
+  expect(prompt.after).toEqual(['Next cue']);
+  expect(prompt.secondary).toEqual(['Am I that kind of person?']);
+  player.close();
+});
+
+test('forged or stale bridge selections never pause or start a request', () => {
+  const player = fakePlayer();
+  const forged = { cue: { trackId: 1, index: 0, text: 'Different cue' }, start: 0, end: 4, text: 'Diff' };
+  player.overlay.get('selected')!(forged);
+  player.overlay.get('explain')!(forged);
+  player.sidebar.get('followUp')!({ question: 'Send anyway' });
+  expect(player.actions).not.toContain('pause');
+  expect(player.frames).toHaveLength(0);
+  player.close();
+});
+
+test('new Explain invalidates the prior request and keeps its own selected phrase', () => {
+  const player = fakePlayer();
+  player.overlay.get('explain')!(select(player));
+  player.frames[0]('READY\n'); player.tick();
+  const next = { cue: { trackId: 1, index: 1, text: 'Next cue' }, start: 0, end: 4, text: 'Next' };
+  player.overlay.get('selected')!(next);
+  player.overlay.get('explain')!(next);
+  player.frames[0]('DELTA U1RBTEU=\nDONE\n'); player.tick();
+  expect(player.states.at(-1).phrase).toBe('Next');
+  expect(player.states.at(-1).turns[0].answer).toBe('');
+  expect(player.writes.some(value => value.endsWith('/control:STOP\n'))).toBe(true);
+  player.close();
+});
