@@ -1,4 +1,5 @@
 import type { Cue } from './subtitles';
+import { utf8Bytes } from './utf8';
 
 export type SelectionSnapshot = {
   mediaEpoch: number; sourceTrackId: number; cueIndex: number; cueStartMs: number; cueEndMs: number;
@@ -53,7 +54,7 @@ export class Conversation {
   private start(index: number): { owner: RequestOwner; messages: Message[] } {
     if (this.active) throw new Error('A response is already generating');
     const messages = this.messagesFor(index);
-    if (new TextEncoder().encode(JSON.stringify(messages)).length > 100_000) throw new Error('Conversation exceeds request limit');
+    if (utf8Bytes(JSON.stringify(messages)) > 100_000) throw new Error('Conversation exceeds request limit');
     const owner = { mediaEpoch: this.context.selection.mediaEpoch, conversationId: this.id, requestId: ++this.nextRequest };
     this.active = owner;
     this.turns[index].answer = '';
@@ -94,7 +95,7 @@ export class Conversation {
   delta(owner: RequestOwner, text: string): boolean {
     if (!this.accepts(owner)) return false;
     const turn = this.turns.at(-1)!;
-    if (new TextEncoder().encode(turn.answer + text).length > 64 * 1024) { this.fail(owner, 'Answer exceeds 64 KiB'); return false; }
+    if (utf8Bytes(turn.answer + text) > 64 * 1024) { this.fail(owner, 'Answer exceeds 64 KiB'); return false; }
     turn.answer += text;
     return true;
   }

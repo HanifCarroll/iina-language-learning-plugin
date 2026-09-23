@@ -42,7 +42,8 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
   bridge.onMessage('cue', encoded => {
     try {
       const next: unknown = JSON.parse(decodeURIComponent(encoded));
-      if (!next || typeof next !== 'object') return;
+      if (next === null) { state.cueChanged(null); render(); return; }
+      if (typeof next !== 'object') return;
       const item = next as DisplayCue;
       if (!Number.isInteger(item.trackId) || !Number.isInteger(item.index) ||
         typeof item.text !== 'string' || item.text.length > 4_000) return;

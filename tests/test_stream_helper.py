@@ -5,6 +5,7 @@ import json
 import os
 import pathlib
 import secrets
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -16,6 +17,12 @@ import unittest
 BINARY = pathlib.Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else None
 if BINARY:
     del sys.argv[1]
+
+
+class MockServer(http.server.ThreadingHTTPServer):
+    def handle_error(self, request, client_address):
+        if not isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError)):
+            super().handle_error(request, client_address)
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -39,8 +46,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
+        if self.path == "/redirect-same":
+            self.send_response(307)
+            self.send_header("Location", "/stream")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if self.path == "/redirect-get":
+            self.send_response(302)
+            self.send_header("Location", "/stream")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if self.path == "/unauth":
             self.send_response(401)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if self.path in ("/rate-limit", "/outage"):
+            self.send_response(429 if self.path == "/rate-limit" else 503)
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
@@ -50,6 +74,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
+        if self.path == "/invalid":
+            self.wfile.write(b"data: {broken}\n\n")
+            self.wfile.flush()
+            return
+        if self.path == "/interrupted":
+            self.connection.close()
+            return
         if self.path == "/slow-first":
             return
         parts = ["Ön", "ce", " test"]
@@ -73,8 +104,8 @@ class HelperTest(unittest.TestCase):
     def setUpClass(cls):
         assert BINARY and BINARY.is_file()
         Handler.expected_key = secrets.token_urlsafe(20)
-        cls.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        cls.other = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        cls.server = MockServer(("127.0.0.1", 0), Handler)
+        cls.other = MockServer(("127.0.0.1", 0), Handler)
         Handler.redirect_port = cls.other.server_port
         for server in (cls.server, cls.other):
             threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -83,6 +114,8 @@ class HelperTest(unittest.TestCase):
     def tearDownClass(cls):
         cls.server.shutdown()
         cls.other.shutdown()
+        cls.server.server_close()
+        cls.other.server_close()
 
     def run_helper(self, path, *, timeouts=None, stop_after_delta=False):
         with tempfile.TemporaryDirectory() as parent:
@@ -153,13 +186,46 @@ class HelperTest(unittest.TestCase):
             ("http://example.com/chat/completions", "ERROR request_invalid"),
             ("http://user:pass@127.0.0.1:9/chat/completions", "ERROR request_invalid"),
             (self.url("/redirect-other"), "ERROR redirect_blocked"),
+            (self.url("/redirect-get"), "ERROR redirect_blocked"),
             (self.url("/unauth"), "ERROR http_401"),
+            (self.url("/rate-limit"), "ERROR http_429"),
+            (self.url("/outage"), "ERROR http_503"),
+            (self.url("/invalid"), "ERROR invalid_sse"),
         ]:
             with self.subTest(url=url):
                 lines, _ = self.run_helper(url)
                 self.assertEqual(lines[-1], expected)
         self.assertFalse(any(row[0] == self.other.server_port for row in Handler.seen),
                          "redirect target must receive no request")
+
+    def test_same_origin_redirect_preserves_auth(self):
+        before = len(Handler.seen)
+        lines, _ = self.run_helper(self.url("/redirect-same"))
+        self.assertEqual(lines[-1], "DONE")
+        seen = Handler.seen[before:]
+        self.assertEqual([row[1] for row in seen], ["/redirect-same", "/stream"])
+        self.assertTrue(all(row[2] for row in seen))
+
+    def test_tls_rejects_untrusted_certificate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cert = pathlib.Path(directory) / "cert.pem"
+            key = pathlib.Path(directory) / "key.pem"
+            subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+                            "-keyout", str(key), "-out", str(cert), "-days", "1",
+                            "-subj", "/CN=localhost"], check=True, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
+            server = MockServer(("127.0.0.1", 0), Handler)
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.load_cert_chain(str(cert), str(key))
+            server.socket = context.wrap_socket(server.socket, server_side=True)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                lines, _ = self.run_helper(f"https://127.0.0.1:{server.server_port}/stream")
+                self.assertEqual(lines[-1], "ERROR tls_failure")
+            finally:
+                server.shutdown()
+                server.server_close()
 
     def test_timeouts(self):
         lines, _ = self.run_helper(self.url("/slow-first"), timeouts={"firstByteMs": 300})

@@ -144,13 +144,19 @@ private final class Stream: NSObject, URLSessionDataDelegate, URLSessionTaskDele
                   willPerformHTTPRedirection response: HTTPURLResponse,
                   newRequest request: URLRequest,
                   completionHandler: @escaping (URLRequest?) -> Void) {
-    guard let next = request.url, endpointIsAllowed(next), sameOrigin(endpoint, next) else {
+    guard [307, 308].contains(response.statusCode), let next = request.url,
+          endpointIsAllowed(next), sameOrigin(endpoint, next) else {
       lock.lock(); reason = "redirect_blocked"; lock.unlock()
       completionHandler(nil)
       task.cancel()
       return
     }
-    completionHandler(request)
+    var approved = request
+    // URLSession drops Authorization on redirects. Reattach it only after the
+    // redirected URL passes the exact same-origin check above.
+    approved.setValue(task.originalRequest?.value(forHTTPHeaderField: "Authorization"),
+                      forHTTPHeaderField: "Authorization")
+    completionHandler(approved)
   }
 
   func urlSession(_ session: URLSession, dataTask: URLSessionDataTask,
@@ -220,6 +226,13 @@ private final class Stream: NSObject, URLSessionDataDelegate, URLSessionTaskDele
       }
     } else if sawDone {
       emit("DONE")
+    } else if let error {
+      let failure = error as NSError
+      if failure.domain == NSURLErrorDomain && (-1206 ... -1200).contains(failure.code) {
+        emit("ERROR tls_failure")
+      } else {
+        emit("ERROR interrupted")
+      }
     } else {
       emit("ERROR interrupted")
     }
@@ -258,15 +271,26 @@ private func run() {
     control.stop(count > 0 ? "stop" : "control_closed")
   }
   emit("READY")
-  let fd = open(requestPath, O_RDONLY)
+  // A plugin window can close before its timer handles READY. Bound that startup
+  // wait so no unauthenticated helper remains blocked on an unopened request FIFO.
+  let fd = open(requestPath, O_RDONLY | O_NONBLOCK)
   guard fd >= 0 else { fail("request_open") }
   var requestData = Data()
   var buffer = [UInt8](repeating: 0, count: 8192)
+  let requestDeadline = Date().addingTimeInterval(10)
   while true {
     let count = read(fd, &buffer, buffer.count)
-    if count <= 0 { break }
-    requestData.append(contentsOf: buffer.prefix(count))
-    if requestData.count > maxRequestBytes { close(fd); fail("request_too_large") }
+    if count > 0 {
+      requestData.append(contentsOf: buffer.prefix(count))
+      if requestData.count > maxRequestBytes { close(fd); fail("request_too_large") }
+    } else if count == 0 && !requestData.isEmpty {
+      break
+    } else if count < 0 && errno != EAGAIN && errno != EINTR {
+      close(fd); fail("request_read")
+    }
+    if Date() >= requestDeadline { close(fd); fail("request_timeout") }
+    if getppid() != parent { close(fd); fail("parent_exit") }
+    usleep(10_000)
   }
   close(fd)
   guard let root = (try? JSONSerialization.jsonObject(with: requestData)) as? [String: Any],

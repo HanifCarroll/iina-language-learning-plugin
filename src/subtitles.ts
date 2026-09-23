@@ -1,3 +1,5 @@
+import { utf8Bytes } from './utf8';
+
 export const MAX_SUBTITLE_BYTES = 8 * 1024 * 1024;
 export const MAX_CUES = 50_000;
 export const MAX_CUE_CHARS = 4_000;
@@ -21,7 +23,7 @@ function plainText(text: string): string {
 }
 
 export function parseSubtitles(input: string, format: 'srt' | 'vtt'): Cue[] {
-  if (new TextEncoder().encode(input).length > MAX_SUBTITLE_BYTES) throw new Error('Subtitle file exceeds 8 MiB');
+  if (utf8Bytes(input) > MAX_SUBTITLE_BYTES) throw new Error('Subtitle file exceeds 8 MiB');
   const normalized = input.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
   const lines = normalized.split('\n');
   if (format === 'vtt' && !/^WEBVTT(?:[ \t]|$)/.test(lines[0])) throw new Error('Missing WEBVTT header');
@@ -55,14 +57,21 @@ export function cueAt(cues: Cue[], mediaMs: number, delayMs = 0, speed = 1): Cue
   return matching.length === 1 ? matching[0] : null;
 }
 
-export function contextForCue(source: Cue[], index: number, secondary: Cue[] = [], includeSecondary = true) {
+export function contextForCue(source: Cue[], index: number, secondary: Cue[] = [], includeSecondary = true,
+  timing: { sourceDelayMs: number; secondaryDelayMs: number; speed: number } =
+    { sourceDelayMs: 0, secondaryDelayMs: 0, speed: 1 }) {
   const current = source[index];
   if (!current || current.index !== index) throw new Error('Selected cue is no longer available');
+  if (!Number.isFinite(timing.speed) || timing.speed <= 0) throw new Error('Invalid subtitle speed');
+  const sourceStart = current.startMs / timing.speed + timing.sourceDelayMs;
+  const sourceEnd = current.endMs / timing.speed + timing.sourceDelayMs;
   const neighboring = {
     before: source.slice(Math.max(0, index - 3), index),
     current,
     after: source.slice(index + 1, index + 4),
-    secondary: includeSecondary ? secondary.filter(cue => cue.startMs < current.endMs && cue.endMs > current.startMs) : []
+    secondary: includeSecondary ? secondary.filter(cue =>
+      cue.startMs / timing.speed + timing.secondaryDelayMs < sourceEnd &&
+      cue.endMs / timing.speed + timing.secondaryDelayMs > sourceStart) : []
   };
   if (JSON.stringify(neighboring).length > 32_000) throw new Error('Subtitle context exceeds limit');
   return neighboring;

@@ -1,3 +1,5 @@
+import { utf8Bytes } from './utf8';
+
 export type StreamRecord = { kind: 'ready' | 'done' } | { kind: 'delta' | 'error' | 'cancelled'; value: string };
 
 function decodeBase64Utf8(value: string): string {
@@ -68,7 +70,7 @@ export class NativeStream {
 
   constructor(private readonly host: Host, private readonly executable: string,
     private readonly directory: string, payload: string, private readonly onRecord: (record: StreamRecord) => void) {
-    if (new TextEncoder().encode(payload).length > 128 * 1024) throw new Error('Request exceeds helper limit');
+    if (utf8Bytes(payload) > 128 * 1024) throw new Error('Request exceeds helper limit');
     this.payload = payload;
   }
 

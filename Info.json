@@ -1,0 +1,20 @@
+{
+  "name": "IINA Language Learning",
+  "identifier": "io.github.hanifcarroll.iina-language-learning",
+  "version": "0.1.0",
+  "author": { "name": "Hanif Carroll" },
+  "entry": "main.js",
+  "sidebarTab": { "name": "Language Learning" },
+  "permissions": ["video-overlay", "file-system"],
+  "allowedDomains": [],
+  "preferenceDefaults": {
+    "settings": {
+      "endpoint": "",
+      "model": "",
+      "sourceLanguage": "Turkish",
+      "explanationLanguage": "English",
+      "includeSecondary": true,
+      "noKeyRequired": false
+    }
+  }
+}

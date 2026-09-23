@@ -11,6 +11,8 @@ test('full future timeline, timing, repeated text, and secondary overlap', () =>
   expect(contextForCue(source, 1, secondary).after.map(c => c.text)).toEqual(['Same', 'End']);
   expect(contextForCue(source, 1, secondary).secondary.map(c => c.text)).toEqual(['Am I that kind of person?']);
   expect(contextForCue(source, 1, secondary, false).secondary).toEqual([]);
+  expect(contextForCue(source, 1, secondary, true,
+    { sourceDelayMs: 0, secondaryDelayMs: 7_000, speed: 1 }).secondary).toEqual([]);
 });
 
 test('malformed and ambiguous cues do not silently resolve', () => {
