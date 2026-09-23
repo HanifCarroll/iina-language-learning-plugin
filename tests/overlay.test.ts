@@ -1,0 +1,29 @@
+import { test, expect } from 'bun:test';
+import { Window } from 'happy-dom';
+import { mountOverlay } from '../ui/overlay';
+
+test('DOM selection survives cue update, while seek clears it', async () => {
+  const window = new Window();
+  (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;
+  window.document.body.innerHTML = '<div id="cue"></div><div id="actions" hidden><button id="explain"></button><button id="clear"></button></div>';
+  const handlers = new Map<string, (data: string) => void>();
+  const sent: string[] = [];
+  const state = mountOverlay(window.document as unknown as Document, { onMessage: (name, callback) => { handlers.set(name, callback); }, postMessage: name => { sent.push(name); } });
+  const cue = window.document.querySelector('#cue')!;
+  handlers.get('cue')!(encodeURIComponent(JSON.stringify({ trackId: 1, index: 0, text: 'Ben öyle\nbir insan mıyım?' })));
+  cue.dispatchEvent(new window.MouseEvent('mousedown'));
+  handlers.get('cue')!(encodeURIComponent(JSON.stringify({ trackId: 1, index: 1, text: 'Next cue' })));
+  const range = window.document.createRange();
+  range.setStart(cue.firstChild!, 4);
+  range.setEnd(cue.firstChild!, 19);
+  window.document.getSelection()!.addRange(range);
+  cue.dispatchEvent(new window.MouseEvent('mouseup'));
+  await Bun.sleep(5);
+  expect(cue.textContent).toBe('Ben öyle\nbir insan mıyım?');
+  expect(state.pending?.cue.index).toBe(0);
+  expect(sent).toContain('selected');
+  handlers.get('seek')!('');
+  expect(state.pending).toBeNull();
+  expect(cue.textContent).toBe('Next cue');
+  window.happyDOM.abort();
+});
