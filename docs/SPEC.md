@@ -1,7 +1,7 @@
 # IINA Language Learning — MVP Specification
 
 **Version:** 0.1 · **Date:** September 23, 2026  
-**Status:** Development handoff draft. Product decisions below reflect the owner's choices; implementation proposals require the review described in `AGENTS.md`.  
+**Status:** Behavior source of truth. The owner approved the architecture and remaining implementation after the installed-IINA integration milestone. Historical Phase 0 evidence remains in [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) and [INTEGRATION_MILESTONE.md](../INTEGRATION_MILESTONE.md); outstanding product checks are listed below.
 **Working title:** IINA Language Learning. Final project name and plugin identifier are not yet chosen.
 
 ## 1. Product intent
@@ -39,15 +39,15 @@ On the owner's Mac, using a local video and supplied Turkish/English text subtit
 | Languages | Explicit source-language and explanation-language settings; initial defaults Turkish and English. |
 | Keyboard | Add an Explain-selection shortcut if supported without conflicting with IINA. The exact binding requires a host-API check. |
 
-### Implementation defaults to review with the first plan
+### Approved implementation defaults
 
-These settle edge cases for the draft; they are not additional features requested by the owner:
+These settle edge cases for the MVP; they are not additional features requested by the owner:
 
 - The guaranteed first-release input path is local video plus user-supplied external UTF-8 **SRT/VTT** subtitles, including full-length files within the agreed limits. Complete commercial tracks are valid user-supplied runtime inputs; do not commit or distribute them as fixtures. Verify how IINA exposes the selected external file. Do not silently promise complete support for every embedded subtitle format.
 - Closing a conversation means returning to playback of the **same playable media**, including when it was already paused before Explain. Never start a different file or restart ended/stopped playback as a side effect.
 - Closing the panel may retain its most recent conversation in memory for reopening in that player window; there is no history list. A new Explain action, media change, or window close clears it.
 - The built-in learner brief assumes a beginner in the configured source language, with grammatical terminology briefly explained. Do not embed the owner's personal biography or presume every user knows Spanish.
-- Optional shortcut, framework, file layout, final identifier, license, and transport implementation are engineering decisions to propose, not reasons to reopen the settled product choices.
+- The approved TypeScript/DOM architecture and packaged Swift helper are recorded in `IMPLEMENTATION_PLAN.md`. An optional shortcut, final identifier, and release license remain engineering/release decisions, not reasons to reopen the settled product choices.
 
 ## 3. Scope boundaries
 
@@ -75,7 +75,7 @@ Preserve its overall composition: unobtrusive selectable subtitles over the exis
 - Preserve the exact selected text and its relationship to the displayed source cue. Do not lowercase, translate, or retokenize the user's selection before sending it.
 - An empty or whitespace-only selection has no actionable menu.
 - Keep normal IINA controls and video interactions working outside the subtitle/action hit areas. Do not place a full-window invisible input blocker over the video.
-- Freeze the selection's text snapshot while a drag or its action menu is active, without pausing playback. Cue updates must not silently change what the user selected. Dismissing the selection returns the overlay to the current playback cue.
+- Freeze the selection's text snapshot while a drag or its action menu is active, without pausing playback. Natural cue advancement must not silently change a pending selection, including while the drag is active. A user seek clears an uninvoked selection. Dismissing a pending selection returns the overlay to the current playback cue.
 - If Explain is invoked after playback has advanced, explain the captured cue; do not substitute the new cue or automatically seek backward.
 
 ### Conversation sidebar
@@ -114,11 +114,12 @@ Simultaneous visibility is required; a particular top/bottom arrangement is not.
 | Follow-up during generation | Disable Send until the response completes or is stopped; do not queue hidden requests. |
 | Stop | Attempt transport cancellation, preserve partial text as **incomplete**, and remain paused. |
 | Close panel during generation | Cancel/invalidate the request, close the panel, resume eligible playback, and ignore late results. |
+| Natural cue advancement | Keep a pending selection and its cue frozen, including a cue change during an active drag; after dismissal, show the current cue. An existing conversation retains its captured context. |
 | Seek within the same media | Live overlay follows playback; an existing conversation keeps its original context. Uninvoked stale selections are cleared. |
 | Change source track | Clear the uninvoked selection and refresh source context. An open conversation remains attached to its captured track/cue and visibly retains that source. |
 | Open a different video / close player window | Cancel work; clear conversation, selection, and cue caches; never resume the old or newly opened file due to a stale close callback. |
-| In-plugin Disable Overlay / overlay failure | Restore the native primary-subtitle state owned by the plugin, remove handlers, and leave IINA usable. Do not hijack another window's playback. |
-| Raw disable in IINA Preferences | IINA 1.5.0-beta2 offers no plugin teardown callback. Native primary subtitles can remain hidden, playback can remain paused, and an active helper request can continue until its bounded total timeout. Document manual recovery through **Subtitles → Show Subtitles** and, when needed, **Playback → Resume**. Do not claim immediate cancellation on this path. |
+| In-plugin Disable Overlay / overlay failure | Cancel active work, invalidate late results, close the conversation under the same-media resume rules, restore the native primary-subtitle state owned by this window, and remove handlers. Test this during an active stream. Do not hijack another window's playback. |
+| Raw disable in IINA Preferences | IINA 1.5.0-beta2 offers no plugin teardown callback. Native primary subtitles can remain hidden, playback can remain paused, and an active helper request can continue until its bounded total timeout. Document manual recovery through **Subtitles → Show Subtitles** and, when needed, **Playback → Resume**. Do not claim immediate cancellation or prevention of provider billing on this path. |
 | Multiple IINA windows | Each owns its own selection, conversation, request, and playback-resume state. Preferences may be shared. |
 
 Distinguish **Stop generating**, **Close/Resume**, and **application/window teardown**. Do not implement all three with a generic “toggle pause.” Explicit native-sidebar dismissal should match Close/Resume where the host exposes a reliable notification; verify this before promising it. Any inability to detect native close requires a proposed UX adjustment, not a hidden discrepancy.
@@ -210,7 +211,7 @@ Settings changes are explicit. Changing the endpoint must not automatically send
 
 ### Keychain requirement and verified naming discrepancy
 
-IINA documents a plugin-namespaced system-Keychain integration. However, its generated documentation names the functions `keyChainWrite` / `keyChainRead`, while the inspected `develop` implementation exports `keychainWrite` / `keychainRead`. **JavaScript is case-sensitive. Verify the actual target runtime and use the working names behind a small credential adapter.** Do not copy the earlier mixed-case example blindly. [R1, R2]
+IINA documents a plugin-namespaced system-Keychain integration. Its generated documentation names `keyChainWrite` / `keyChainRead`, while the inspected source and installed IINA 1.5.0-beta2 runtime expose **`keychainWrite` / `keychainRead`**. A disposable fixture was saved, read, replaced, and read after restart. A forced same-item replacement failure is still untested. JavaScript is case-sensitive; use the verified lowercase methods behind the credential adapter and treat missing methods as unsupported runtime. [R1, R2]
 
 Requirements:
 
@@ -247,15 +248,15 @@ Keep one small repository and one plugin build. Do not create a multi-package fr
 | Credential adapter | Keychain only; no keys in presentation state or conversation objects. |
 | UI | Selection/action, sidebar, settings, safe rendering; validated messages to privileged code. |
 
-These are responsibility boundaries, **not prescribed module names or interfaces**. Codex must propose the smallest concrete design and tests before major implementation.
+The owner approved these responsibility boundaries and the concrete modules/interfaces in `IMPLEMENTATION_PLAN.md`. Keep the product implementation small and independently testable.
 
 Keep locally useful IDs separate from provider payloads. At minimum, async operations must be associated with a window/media generation, conversation ID, and request ID or equivalent ownership tokens so out-of-order callbacks cannot corrupt current state.
 
 Save and restore only host state the plugin changes. Primary hiding is an owned temporary override, not a persistent “turn off subtitles” preference. On supported failure/disable paths, clean up observers/timers and restore native subtitles. Document unexpected-process-exit limitations rather than claiming cleanup can execute after every crash.
 
-## 10. Phase 0 — mandatory feasibility checks
+## 10. Phase 0 and installed-IINA evidence
 
-Before building the complete feature, document a small evidence-backed spike against the actual target Mac/IINA installation. Record macOS, architecture, IINA, bundled mpv, and API-definition versions. No compatibility minimum is asserted by this document until tested.
+The Phase 0 spike and subsequent packaged-helper/UI milestone ran against the actual target Mac and installed IINA. `IMPLEMENTATION_PLAN.md` preserves the original Phase 0 observations, including checks that were open at that time. `INTEGRATION_MILESTONE.md` records the later installed-package results. Neither harness proves the complete product. No compatibility minimum beyond the tested setup is asserted.
 
 | Check | Required evidence / decision |
 |---|---|
@@ -267,15 +268,15 @@ Before building the complete feature, document a small evidence-backed spike aga
 | Sidebar lifecycle | Establish actual close/hide events and how explicit Close/Resume interacts with native dismissal, fullscreen, text focus, and multiple windows. [R8] |
 | Package / permissions | Development linking and a reproducible installable package work; justify every requested permission and any allowed-domain wildcard. |
 
-### Streaming is a material open implementation question
+### Streaming decision and remaining checks
 
-IINA's documented `http.post` returns a promise for a response, and the inspected native implementation resolves through a completion handler; neither establishes an incremental streaming interface. A `stream: true` request body alone does not prove streaming reaches JavaScript. [R9]
+IINA's documented `http.post` returns a promise for a response, and the installed version delivered only the completed body. A `stream: true` request body did not make it incremental. [R9]
 
-First look for a supported privileged streaming path in the target runtime. WebViews have browser networking, but direct use may introduce credential exposure and CORS issues; do not assume it is an equivalent replacement. Do not use `curl` with a Bearer key in its arguments: the inspected IINA utility code logs executed arguments. [R2, R6]
+The owner approved the packaged Swift `URLSession` helper and its `video-overlay`/`file-system` permissions. A private request FIFO carries request JSON and the Keychain-loaded credential; executable arguments contain no credential or prompt. The helper emits incremental ASCII records on stdout and accepts a cancellation marker on its control FIFO. Do not use `curl` with a Bearer key in arguments: IINA logs executed arguments. [R2, R6]
 
-If secure streaming requires a native helper, extra process, broader permissions, or a change in credential isolation, present the minimal design and tradeoffs for approval. Do not silently add a background server, relay service, plaintext secret file, or fake streaming. A helper is an implementation option to review, not a settled dependency.
+In installed IINA, the packaged helper delivered delayed chunks before completion; Stop cancellation, loopback authentication/redirect boundaries, first-byte/idle/total timeouts, and normal IINA-exit cleanup were observed. The `utils.exec` stdout hook runs on a background queue and **must only queue bytes**. A plugin timer drains those bytes before any IINA host API, WebView, or file operation. This tested pattern does not eliminate every host-level concurrency risk. Product cancellation, media replacement, teardown, HTTPS/TLS, and active-stream Disable Overlay still need acceptance tests.
 
-If a required capability cannot be proved, record the specific blocker and the smallest proposed adjustment. Continue independent planning/tests, but do not claim the blocked acceptance criteria pass.
+Raw IINA Preferences disable provides no plugin teardown callback and can leave the helper running to its total request timeout, native primary subtitles hidden, and playback paused. It cannot guarantee immediate cancellation or prevent provider billing. The in-plugin Disable Overlay control is the supported safe shutdown path. Manual recovery after raw disable is documented in A07; no IINA fork or host patch is required.
 
 ## 11. Acceptance scenarios
 
@@ -286,25 +287,25 @@ Use synthetic fixtures rather than distributing television episodes or complete 
 | A01 | **Word:** select `mıyım` and invoke Explain. Exact text and the full cue enter one request; playback pauses; the sidebar opens. |
 | A02 | **Phrase:** drag-select `öyle bir insan`, including across a rendered line break. It is treated as one selection and follows the same action flow. |
 | A03 | **No unintended action:** hover, select, or click away without Explain. No request and no automatic pause occur. |
-| A04 | **Cue race:** cue changes while selecting or before clicking Explain. The request uses the captured selection and original cue, never the replacement text. |
+| A04 | **Cue race versus seek:** natural cue advancement, including a change during an active drag, freezes the pending selection and original cue. A user seek clears an uninvoked selection. An existing conversation retains its original context through both events. Test these separately. |
 | A05 | **Full context:** a middle cue receives three existing preceding and following cues in order, even before following cues have played. Track boundaries produce fewer legitimate neighbors. |
 | A06 | **Timing:** repeated text, seek, and subtitle-delay changes resolve the correct timeline location; stale neighbors are not reused. |
-| A07 | **Dual display and recovery:** selectable Turkish and native English appear at once without duplicate Turkish text. The in-plugin Disable Overlay control restores the previous native-primary state. A raw IINA Preferences disable may leave native primary hidden and playback paused on IINA 1.5.0-beta2; recover with **Subtitles → Show Subtitles** and, if paused, **Playback → Resume**. Test both paths. |
+| A07 | **Dual display and recovery:** selectable Turkish and native English appear at once without duplicate Turkish text. During an active stream, in-plugin Disable Overlay cancels work, invalidates late results, closes/resumes eligible playback, and restores the native-primary state owned by that window. Raw IINA Preferences disable may leave a helper running until total timeout, native primary hidden, and playback paused on IINA 1.5.0-beta2; billing may continue. Recover with **Subtitles → Show Subtitles** and, if paused, **Playback → Resume**. Test both paths. |
 | A08 | **Secondary context:** enabled attaches the relevant available translation; disabled omits it while English remains visible. Disabling mid-conversation prevents old automatically attached translation context from being resent. |
 | A09 | **Meaning contract:** the initial prompt always requires both Natural meaning and Literal meaning, plus relevant breakdown/grammar. A small manual model sample is reviewed for quality; unit tests do not pretend to prove linguistic correctness. |
 | A10 | **Follow-up:** ask `Why is bir used here?`. Preserve the original phrase/cue/context, completed prior turns, and new question without recapturing live subtitles. |
 | A11 | **New selection:** invoking Explain for a different phrase replaces the conversation; previous late chunks cannot appear in the new response. |
-| A12 | **Real stream:** delayed SSE chunks update the sidebar incrementally; split UTF-8, multiline/event boundaries and completion markers are handled correctly. |
+| A12 | **Real stream:** delayed SSE chunks update the sidebar incrementally; split UTF-8, multiline/event boundaries and completion markers are handled correctly. The stdout hook only queues bytes; a timer performs all host/UI work. Test cancellation, media replacement, and teardown without claiming universal host-level concurrency safety. |
 | A13 | **Stop vs close:** Stop cancels and remains paused. Close cancels if needed and resumes the same playable video. Partial output is marked incomplete. |
 | A14 | **Close edge cases:** closing settings does not resume; closing a conversation on ended/stopped/different media does not start playback; native sidebar dismissal follows the verified behavior. |
-| A15 | **Isolation:** two player windows and a media change do not mix subtitles, API responses, or pause/resume effects. |
+| A15 | **Isolation:** simultaneous requests in two player windows and a media change do not mix subtitles, API responses, or pause/resume effects. |
 | A16 | **Configuration:** missing/invalid URL, model, or required credentials produces actionable UI and no accidental request. Saving settings alone sends no subtitles. |
 | A17 | **Credentials:** disposable key survives restart and can be replaced through verified Keychain calls. Read/write failure never creates plaintext fallback, false success, or secret-bearing diagnostics. |
 | A18 | **Endpoint changes:** a new host does not receive the previous host's credential or existing conversation without deliberate setup/new action. |
-| A19 | **Failures:** authentication/authorization error, rate limit, provider outage, timeout, invalid JSON/SSE, and interrupted stream produce clear states; retries are manual and not duplicated. |
+| A19 | **Failures and transport security:** HTTPS/TLS validation, redirect/authentication boundaries, authentication/authorization error, rate limit, provider outage, timeout, invalid JSON/SSE, and interrupted stream produce clear states; retries are manual and not duplicated. |
 | A20 | **Untrusted text:** subtitle/model HTML, script-like content, prompt-injection text, and forged bridge messages cannot execute code, redirect privileged requests, or reveal the stored key. |
 | A21 | **Unsupported input:** no subtitle, empty cue, unreadable file, malformed track, and bitmap/unsupported embedded track leave native playback/subtitles usable and explain the limitation. |
-| A22 | **UI integration:** window resize, fullscreen, ordinary IINA controls, keyboard selection/action where supported, composer focus, and Turkish characters remain usable. |
+| A22 | **UI integration:** window resize, fullscreen selection, ordinary IINA controls, keyboard selection/action where supported, sidebar/composer focus and native dismissal, and Turkish characters remain usable. |
 | A23 | **Session lifecycle:** latest conversation is memory-only; a new media session/restart has no previous chat. Non-secret settings and the saved Keychain credential persist as intended. |
 | A24 | **Boundaries:** oversized input/history produces a documented visible limit; no silent context corruption, hidden summarization request, or automatic stronger-model escalation. |
 
@@ -312,9 +313,9 @@ Automate pure context/conversation/parser/prompt logic and DOM/bridge behavior w
 
 ## 12. Development sequence and definition of done
 
-Follow `AGENTS.md`. First produce a small implementation plan with module/interface/name proposals, behavioral test scenarios, source/license findings, and Phase 0 results. Obtain one consolidated approval before major feature implementation.
+Follow `AGENTS.md`. The implementation plan and installed-IINA milestone have been reviewed and the owner approved remaining feature implementation under their architecture, boundaries, and Swift-helper permissions. Preserve the historical observations while distinguishing them from product acceptance evidence.
 
-After approval, build in thin increments:
+Build and verify in thin local commits:
 
 1. Plugin skeleton and proven overlay/sidebar integration; native restoration and dual-subtitle coexistence.
 2. Selection snapshot and external-subtitle context; test through a fake provider.
@@ -322,7 +323,7 @@ After approval, build in thin increments:
 4. Initial explanation, follow-ups, cancellation, close/resume, and lifecycle isolation.
 5. Error handling, UI verification, packaging, installation and contributor documentation.
 
-A phase may be reordered when a feasibility dependency requires it; do not defer streaming feasibility until after polishing the UI.
+A phase may be reordered for implementation dependencies. Streaming feasibility has already been demonstrated in a packaged installed-IINA harness; production integration and the remaining acceptance matrix are still required.
 
 **Done means:** the required acceptance scenarios have evidence; limitations and tested versions are explicit; TypeScript/tests/build pass; a clean checkout produces an installable plugin; a real-Mac smoke test covers the whole loop with a configured provider; no secrets or user media appear in the repository; attribution is correct; and the owner can watch, select, learn, converse, and resume.
 
