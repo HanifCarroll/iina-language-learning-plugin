@@ -14,6 +14,9 @@ type Settings = {
 };
 type Appearance = { showTranslation: boolean; sourceSize: number; sourceColor: string; sourceBottom: number;
   translationSize: number; translationColor: string; translationGap: number };
+type CueReplay = { epoch: number; url: string; conversationId: number; startMs: number; endMs: number;
+  returnPositionMs: number; wasPaused: boolean; startedAt: number; phase: 'starting' | 'playing';
+  sawPlaying: boolean; awaitingInitialSeek: boolean };
 const DEFAULT_APPEARANCE: Appearance = { showTranslation: false, sourceSize: 28, sourceColor: '#ffffff',
   sourceBottom: 8, translationSize: 25, translationColor: '#ffffff', translationGap: 12 };
 const DEFAULTS: Settings = {
@@ -61,6 +64,8 @@ function validSettings(value: unknown): Settings {
 export class Session {
   private readonly credentials: Credentials;
   private settings: Settings;
+  private appearancePreview: Appearance | null = null;
+  private replay: CueReplay | null = null;
   private hasSavedKey = false;
   private mediaEpoch = 0;
   private mediaUrl = '';
@@ -138,7 +143,7 @@ export class Session {
     overlay.onMessage('overlayReady', () => {
       this.overlayReady = true;
       if (this.overlayEnabled) this.host.showOverlay();
-      this.host.toOverlay('appearance', this.settings.appearance);
+      this.host.toOverlay('appearance', this.appearancePreview ?? this.settings.appearance);
       this.updateCue(true);
     });
     overlay.onMessage('selected', value => this.selectionReceived(value));
@@ -148,17 +153,26 @@ export class Session {
     sidebar.onMessage('followUp', value => this.followUp(value));
     sidebar.onMessage('stop', () => this.stop());
     sidebar.onMessage('retry', () => this.retry());
+    sidebar.onMessage('replayCue', () => this.toggleReplay());
     sidebar.onMessage('close', () => this.hideConversation());
     sidebar.onMessage('disableOverlay', () => this.disableOverlay());
     sidebar.onMessage('enableOverlay', () => this.enableOverlay());
     sidebar.onMessage('saveSettings', value => this.saveSettings(value));
     sidebar.onMessage('saveAppearance', value => this.saveAppearance(value));
-    sidebar.onMessage('settingsView', value => { this.settingsOpen = (value as { open?: unknown })?.open === true; });
+    sidebar.onMessage('previewAppearance', value => this.previewAppearance(value));
+    sidebar.onMessage('settingsView', value => {
+      this.settingsOpen = (value as { open?: unknown })?.open === true;
+      if (!this.settingsOpen) this.discardAppearancePreview();
+    });
     sidebar.onMessage('visibility', value => {
       const hidden = (value as { hidden?: unknown })?.hidden;
       if (hidden === false) this.sidebarVisible = true;
       if (hidden === true && this.host.windowVisible) {
         this.sidebarVisible = false;
+        if (this.settingsOpen) {
+          this.discardAppearancePreview();
+          this.host.toSidebar('appearancePreviewEnded', {});
+        }
         if (this.conversation && !this.settingsOpen) this.hideConversation();
       }
     });
@@ -236,6 +250,8 @@ export class Session {
 
   private mediaChanged(): void {
     if (this.closed) return;
+    this.replay = null;
+    this.discardAppearancePreview();
     this.cancelRequest();
     this.conversation = null;
     this.resume = null;
@@ -308,9 +324,10 @@ export class Session {
         if (this.status === mismatch) { this.status = 'Select a subtitle phrase to begin.'; this.render(); }
       }
     }
-    if (cue && this.settings.appearance.showTranslation && this.secondaryId !== null) this.host.ownSecondary();
+    const appearance = this.appearancePreview ?? this.settings.appearance;
+    if (cue && appearance.showTranslation && this.secondaryId !== null) this.host.ownSecondary();
     else this.host.restoreSecondary();
-    const translation = cue && this.settings.appearance.showTranslation && this.secondaryId !== null ? this.host.secondaryText : '';
+    const translation = cue && appearance.showTranslation && this.secondaryId !== null ? this.host.secondaryText : '';
     if (force || translation !== this.translationText) {
       this.translationText = translation;
       this.host.toOverlay('translation', translation);
@@ -323,6 +340,14 @@ export class Session {
   }
 
   private seek(): void {
+    const replay = this.replay;
+    if (replay) {
+      const position = this.host.positionMs;
+      const initialSeek = replay.awaitingInitialSeek && Date.now() - replay.startedAt < 1_500 &&
+        (Math.abs(position - replay.startMs) <= 300 || Math.abs(position - replay.returnPositionMs) <= 300);
+      replay.awaitingInitialSeek = false;
+      if (!initialSeek) { this.replay = null; this.render(); }
+    }
     this.pending = null;
     if (this.overlayReady) this.host.toOverlay('seek', {});
     this.updateCue(true);
@@ -338,6 +363,7 @@ export class Session {
     if (!sourceCue || sourceCue.text !== cue.text || start < 0 || end <= start || end > sourceCue.text.length) return;
     const text = sourceCue.text.slice(start, end);
     if (!text.trim() || text.length > 4_000) return;
+    this.replay = null;
     const key = `${this.mediaEpoch}:${this.sourceId}:${sourceCue.index}:${start}:${end}`;
     if (this.sidebarVisible && this.lastSelection?.key === key && Date.now() - this.lastSelection.at < 500) return;
     this.lastSelection = { key, at: Date.now() };
@@ -353,6 +379,7 @@ export class Session {
       submitted.cue?.trackId !== this.sourceId) return;
     const pending = this.pending;
     this.pending = null;
+    this.discardAppearancePreview();
     if (this.overlayReady) this.host.toOverlay('clear', {});
     const sourceCue = this.source[pending.cue.index];
     try {
@@ -417,6 +444,7 @@ export class Session {
 
   private followUp(value: unknown): void {
     if (!this.conversation || !value || typeof value !== 'object') return;
+    this.finishReplay(true);
     const question = (value as { question?: unknown }).question;
     try {
       const request = this.conversation.followUp(typeof question === 'string' ? question : '');
@@ -428,6 +456,7 @@ export class Session {
 
   private retry(): void {
     if (!this.conversation) return;
+    this.finishReplay(true);
     try {
       const request = this.conversation.retry();
       this.pauseForConversation();
@@ -459,6 +488,7 @@ export class Session {
 
   private hideConversation(): void {
     if (!this.conversation) return;
+    this.finishReplay(true);
     this.conversation.stop();
     this.cancelRequest();
     this.host.hideSidebar();
@@ -478,6 +508,8 @@ export class Session {
   }
 
   private disableOverlay(): void {
+    this.finishReplay(true);
+    this.discardAppearancePreview();
     this.closeConversation();
     this.cancelRequest();
     this.pending = null;
@@ -501,21 +533,18 @@ export class Session {
 
   private saveSettings(value: unknown): void {
     try {
-      const next = validSettings(value);
+      const next = validSettings({ ...(value as object), appearance: this.settings.appearance });
       const key = (value as { key?: unknown }).key;
       if (key !== '' && key !== undefined) {
         if (typeof key !== 'string') throw new Error('Invalid API key');
         this.credentials.save(next.endpoint, key);
       }
       const changed = JSON.stringify({ ...next, appearance: undefined }) !== JSON.stringify({ ...this.settings, appearance: undefined }) || !!key;
-      const appearanceChanged = JSON.stringify(next.appearance) !== JSON.stringify(this.settings.appearance);
       this.settings = next;
       this.hasSavedKey = this.credentials.hasSavedKey(next.endpoint);
       this.host.raw.preferences.set('settings', next);
       this.host.raw.preferences.sync();
       if (changed && this.conversation) { this.closeConversation(); this.host.showSidebar(); this.sidebarVisible = true; }
-      if (appearanceChanged && this.overlayReady) this.host.toOverlay('appearance', next.appearance);
-      if (appearanceChanged) this.updateCue(true);
       this.status = 'Settings saved. No request was sent.';
     } catch (error) { this.status = error instanceof Error ? error.message : 'Could not save settings'; }
     this.render();
@@ -523,13 +552,103 @@ export class Session {
 
   private saveAppearance(value: unknown): void {
     try {
-      this.settings.appearance = validAppearance(value);
-      this.host.raw.preferences.set('settings', this.settings);
+      const appearance = validAppearance(value);
+      const next = { ...this.settings, appearance };
+      this.host.raw.preferences.set('settings', next);
       this.host.raw.preferences.sync();
+      this.settings = next;
+      this.appearancePreview = null;
       if (this.overlayReady) this.host.toOverlay('appearance', this.settings.appearance);
       this.updateCue(true);
       this.status = 'Subtitle appearance saved.';
     } catch (error) { this.status = error instanceof Error ? error.message : 'Could not save subtitle appearance'; }
+    this.render();
+  }
+
+  private previewAppearance(value: unknown): void {
+    if (!this.settingsOpen || !this.overlayEnabled) return;
+    try {
+      this.appearancePreview = validAppearance(value);
+    } catch { return; }
+
+    if (this.overlayReady) this.host.toOverlay('appearance', this.appearancePreview);
+    this.updateCue(true);
+  }
+
+  private discardAppearancePreview(): void {
+    if (!this.appearancePreview) return;
+    this.appearancePreview = null;
+    if (this.overlayReady) this.host.toOverlay('appearance', this.settings.appearance);
+    this.updateCue(true);
+  }
+
+  private toggleReplay(): void {
+    if (this.replay) { this.finishReplay(true); return; }
+
+    // 1. Resolve the selected cue against this window's current playback timeline.
+    const conversation = this.conversation;
+    if (!conversation || conversation.context.selection.mediaEpoch !== this.mediaEpoch ||
+      conversation.context.selection.sourceTrackId !== this.host.sourceId ||
+      this.mediaUrl !== this.host.mediaUrl || !this.host.playable) return;
+    const selection = conversation.context.selection;
+    const speed = this.host.subtitleSpeed;
+    const startMs = Math.max(0, selection.cueStartMs / speed + this.host.delayMs);
+    const duration = this.host.raw.core.status.duration;
+    const cueEndMs = selection.cueEndMs / speed + this.host.delayMs;
+    const endMs = duration !== null && Number.isFinite(duration) && duration > 0 ?
+      Math.min(duration * 1000, cueEndMs) : cueEndMs;
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs - startMs < 100) return;
+
+    // 2. Keep the current watch position and pause state for the return trip.
+    this.replay = { epoch: this.mediaEpoch, url: this.mediaUrl, conversationId: conversation.id,
+      startMs, endMs, returnPositionMs: this.host.positionMs, wasPaused: this.host.paused,
+      startedAt: Date.now(), phase: 'starting', sawPlaying: false, awaitingInitialSeek: true };
+    try {
+      this.host.seekTo(startMs);
+      this.host.resume();
+    } catch {
+      this.replay = null;
+      this.status = 'Could not replay this line.';
+    }
+    this.render();
+  }
+
+  private tickReplay(): void {
+    const replay = this.replay;
+    if (!replay) return;
+    if (replay.epoch !== this.mediaEpoch || replay.url !== this.host.mediaUrl ||
+      this.conversation?.context.selection.sourceTrackId !== this.host.sourceId ||
+      replay.conversationId !== this.conversation?.id) { this.replay = null; this.render(); return; }
+
+    const position = this.host.positionMs;
+    if (replay.phase === 'starting') {
+      if (position >= replay.startMs - 250 && position < replay.endMs) replay.phase = 'playing';
+      else if (Date.now() - replay.startedAt > 5_000) {
+        this.finishReplay(true);
+        this.status = 'Could not replay this line.';
+        this.render();
+        return;
+      } else return;
+    }
+
+    if (!this.host.paused) replay.sawPlaying = true;
+    if ((replay.sawPlaying && this.host.paused) || position < replay.startMs - 500 || position > replay.endMs + 1_000) {
+      this.replay = null;
+      this.render();
+      return;
+    }
+    if (position >= replay.endMs - 50) this.finishReplay(true);
+  }
+
+  private finishReplay(restorePosition: boolean): void {
+    const replay = this.replay;
+    if (!replay) return;
+    this.replay = null;
+    if (restorePosition && replay.epoch === this.mediaEpoch && replay.url === this.host.mediaUrl) {
+      this.host.pause();
+      this.host.seekTo(replay.returnPositionMs);
+      if (!replay.wasPaused) this.host.resume();
+    }
     this.render();
   }
 
@@ -545,6 +664,10 @@ export class Session {
     this.host.toSidebar('state', {
       status: this.status, open: !!conversation, conversationId: conversation?.id ?? null,
       overlayEnabled: this.overlayEnabled,
+      replaying: this.replay !== null,
+      replayAvailable: !!conversation && conversation.context.selection.mediaEpoch === this.mediaEpoch &&
+        conversation.context.selection.sourceTrackId === this.host.sourceId &&
+        this.mediaUrl === this.host.mediaUrl && this.host.playable,
       phrase: conversation?.context.selection.exactText ?? '',
       cue: conversation?.context.selection.cueText ?? '',
       turns: conversation?.turns ?? [],
@@ -555,6 +678,7 @@ export class Session {
   private tick(): void {
     if (this.closed) return;
     if (this.host.mediaUrl !== this.mediaUrl) { this.ended = false; this.mediaChanged(); }
+    this.tickReplay();
     this.syncTracks();
     this.updateCue();
     const active = this.active;
@@ -564,6 +688,7 @@ export class Session {
 
   private teardown(): void {
     this.closed = true;
+    this.replay = null;
     this.conversation?.stop();
     this.cancelRequest();
     this.conversation = null;

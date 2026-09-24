@@ -4,10 +4,10 @@ export type SubtitleTrack = { id: number; isExternal: boolean; title: string | n
 export type MenuItem = { addSubMenuItem(item: MenuItem): MenuItem };
 export type RawIina = {
   core: {
-    status: { url: string; position: number; duration: number; idle: boolean };
+    status: { url: string; position: number; duration: number | null; idle: boolean; paused: boolean };
     window: { loaded: boolean; visible: boolean };
     subtitle: { id: number | null; secondID: number | null; tracks: SubtitleTrack[]; loadTrack(path: string): void };
-    pause(): void; resume(): void;
+    pause(): void; resume(): void; seekTo(seconds: number): void;
   };
   event: { on(name: string, callback: () => void): string; off(name: string, id: string): void };
   file: { read(path: string, options: object): string | undefined; exists(path: string): boolean;
@@ -35,6 +35,7 @@ export class IinaHost {
   get sourceId(): number | null { return this.raw.core.subtitle.id; }
   get secondaryId(): number | null { return this.raw.core.subtitle.secondID; }
   get positionMs(): number { return (this.raw.core.status.position || 0) * 1000; }
+  get paused(): boolean { return this.raw.core.status.paused; }
   get delayMs(): number { return (this.raw.mpv.getNumber('sub-delay') || 0) * 1000; }
   get secondaryDelayMs(): number { return (this.raw.mpv.getNumber('secondary-sub-delay') || 0) * 1000; }
   get subtitleSpeed(): number { return this.raw.mpv.getNumber('sub-speed') || 1; }
@@ -45,7 +46,8 @@ export class IinaHost {
   get windowVisible(): boolean { return this.raw.core.window.visible; }
   get playable(): boolean {
     const status = this.raw.core.status;
-    return !status.idle && (!Number.isFinite(status.duration) || status.position < status.duration - 0.1);
+    return !status.idle && (status.duration === null || !Number.isFinite(status.duration) ||
+      status.position < status.duration - 0.1);
   }
 
   externalTrack(id: number | null): SubtitleTrack | null {
@@ -93,6 +95,7 @@ export class IinaHost {
 
   pause(): void { this.raw.core.pause(); }
   resume(): void { this.raw.core.resume(); }
+  seekTo(positionMs: number): void { this.raw.core.seekTo(positionMs / 1000); }
   showOverlay(): void { this.raw.overlay.setClickable(true); this.raw.overlay.show(); }
   hideOverlay(): void { this.raw.overlay.hide(); }
   showSidebar(): void { this.raw.sidebar.show(); }

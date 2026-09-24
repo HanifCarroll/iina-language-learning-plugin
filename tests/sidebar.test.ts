@@ -17,7 +17,9 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
     turns: [{ question: 'Why?', answer: '<img src="https://evil.example/x">', status: 'complete' }],
     settings: { endpoint: 'https://example.com/v1', model: 'test', sourceLanguage: 'Turkish',
       explanationLanguage: 'English', includeSecondary: true, noKeyRequired: false,
-      hasSavedKey: false, requestUrl: 'https://example.com/v1/chat/completions' }
+      hasSavedKey: false, requestUrl: 'https://example.com/v1/chat/completions',
+      appearance: { showTranslation: false, sourceSize: 28, sourceColor: '#ffffff', sourceBottom: 8,
+        translationSize: 25, translationColor: '#ffffff', translationGap: 12 } }
   })));
   expect(window.document.querySelectorAll('img,script')).toHaveLength(1); // packaged script element only
   expect(window.document.querySelector('#turns')!.textContent).toContain('<img src="https://evil.example/x">');
@@ -29,6 +31,48 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
   expect(sent.at(-1)?.name).toBe('saveSettings');
   expect(sent.at(-1)?.data.key).toBe('new-fixture-value');
   expect(window.document.body.textContent).not.toContain('new-fixture-value');
+  window.happyDOM.abort();
+});
+
+test('appearance inputs preview without saving, Back discards the draft, and Replay line toggles', async () => {
+  const window = new Window();
+  (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;
+  window.document.body.innerHTML = (await Bun.file('ui/sidebar.html').text()).split('<body>')[1].split('</body>')[0];
+  const handlers = new Map<string, (data: string) => void>();
+  const sent: Array<{ name: string; data: unknown }> = [];
+  mountSidebar(window.document as unknown as Document, {
+    onMessage: (name, callback) => { handlers.set(name, callback); },
+    postMessage: (name, data) => sent.push({ name, data })
+  });
+  const appearance = { showTranslation: false, sourceSize: 28, sourceColor: '#ffffff', sourceBottom: 8,
+    translationSize: 25, translationColor: '#ffffff', translationGap: 12 };
+  const state = (replaying = false) => handlers.get('state')!(encodeURIComponent(JSON.stringify({
+    status: 'Complete', open: true, conversationId: 1, overlayEnabled: true,
+    replayAvailable: true, replaying, phrase: 'öyle', cue: 'Ben öyle bir insan mıyım?',
+    turns: [{ question: '', answer: 'Meaning', status: 'complete' }],
+    settings: { endpoint: '', model: '', sourceLanguage: 'Turkish', explanationLanguage: 'English',
+      includeSecondary: true, noKeyRequired: true, hasSavedKey: false, requestUrl: '', appearance }
+  })));
+  state();
+  const replay = window.document.querySelector('#replay') as unknown as HTMLButtonElement;
+  expect(replay.hidden).toBe(false);
+  replay.click();
+  expect(sent.at(-1)).toEqual({ name: 'replayCue', data: {} });
+  state(true);
+  expect(replay.textContent).toBe('Stop replay');
+
+  (window.document.querySelector('#settingsToggle') as unknown as HTMLButtonElement).click();
+  const size = window.document.querySelector('#sourceSize') as unknown as HTMLInputElement;
+  size.value = '34';
+  size.dispatchEvent(new window.Event('input') as unknown as Event);
+  expect(sent.at(-1)).toMatchObject({ name: 'previewAppearance', data: { sourceSize: 34 } });
+  expect(sent.some(item => item.name === 'saveAppearance')).toBe(false);
+  state();
+  expect(size.value).toBe('34');
+  (window.document.querySelector('#back') as unknown as HTMLButtonElement).click();
+  expect(sent.at(-1)).toEqual({ name: 'settingsView', data: { open: false } });
+  (window.document.querySelector('#settingsToggle') as unknown as HTMLButtonElement).click();
+  expect(size.value).toBe('28');
   window.happyDOM.abort();
 });
 

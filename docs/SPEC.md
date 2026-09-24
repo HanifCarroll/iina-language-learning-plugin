@@ -82,7 +82,7 @@ Preserve its overall composition: unobtrusive selectable subtitles over the exis
 
 ### Conversation sidebar
 
-Display the selected phrase, its complete source cue, an optional timestamp, streamed messages, a multiline follow-up composer, Send, Stop while generating, Retry after an eligible error, and a clear Hide/Resume control. A settings link may open the plugin's provider/language and subtitle appearance settings.
+Display the selected phrase, its complete source cue, an optional timestamp, streamed messages, a multiline follow-up composer, Send, Stop while generating, Retry after an eligible error, Replay line, and a clear Hide/Resume control. A settings link may open the plugin's provider/language and subtitle appearance settings.
 
 Use one conversation view, not separate explanation and chat products. Keep the selected phrase identifiable while scrolling. Enter submits; Shift+Enter inserts a newline, respecting text-composition input. Typing spaces in a text input must not inadvertently control playback.
 
@@ -95,6 +95,8 @@ The initial explanation should visibly distinguish **Natural meaning** and **Lit
 The plugin renders selectable **primary/source** text. Its optional stacked mode also draws IINA's current **secondary/translation** text immediately above the source and suppresses the duplicate native secondary rendering while the source overlay is active. The two lines have separate size and color controls; source distance from the bottom and secondary gap above source control their placement. The secondary context sent to AI remains an independent setting. When stacked mode is off, IINA renders the secondary track natively.
 
 Restore only the native visibility state owned by this window on track/media changes, overlay disable, and teardown. Do not permanently alter the user's IINA subtitle preferences. The installed IINA 1.5.0-beta2 displayed a synthetic secondary cue above Turkish in this mode; further visual and timing checks remain in the acceptance report. [R4]
+
+Appearance edits preview on the video without persisting them. Apply saves the appearance; Back or native settings dismissal restores the saved values and native subtitle visibility. Saving provider settings alone does not save an appearance preview.
 
 ## 5. Interaction lifecycle
 
@@ -115,6 +117,7 @@ Restore only the native visibility state owned by this window on track/media cha
 | Duplicate selection delivery | Do not create duplicate billable requests from mouseup plus double-click for the same gesture. |
 | Follow-up during generation | Disable Send until the response completes or is stopped; do not queue hidden requests. |
 | Stop | Attempt transport cancellation, preserve partial text as **incomplete**, and remain paused. |
+| Replay line | Seek to the captured cue, play it once, then return to the previous watch position and paused/playing state. No provider request is sent. Stop replay returns immediately. A user seek, source-track change, or media replacement cancels replay without jumping back; hiding the panel during replay returns first, then follows the usual resume rule. |
 | Hide panel during generation | Cancel/invalidate the request, mark partial output incomplete, retain the chat, resume eligible playback, and ignore late results. |
 | Natural cue advancement | Keep a pending selection and its cue frozen, including a cue change during an active drag; after dismissal, show the current cue. An existing conversation retains its captured context. |
 | Seek within the same media | Live overlay follows playback; an existing conversation keeps its original context. Uncompleted selections are cleared. |
@@ -310,6 +313,8 @@ Use synthetic fixtures rather than distributing television episodes or complete 
 | A22 | **UI integration:** selecting text does not move the subtitle; window resize, fullscreen selection, ordinary IINA controls, ⌥⌘G panel toggle, sidebar/composer focus and native dismissal, and Turkish characters remain usable. |
 | A23 | **Session lifecycle:** latest conversation is memory-only; a new media session/restart has no previous chat. Non-secret settings and the saved Keychain credential persist as intended. |
 | A24 | **Boundaries:** oversized input/history produces a documented visible limit; no silent context corruption, hidden summarization request, or automatic stronger-model escalation. |
+| A25 | **Appearance preview:** editing size, color, placement, or stacked mode previews immediately without saving. Apply persists; Back and native settings dismissal restore saved values and owned native secondary visibility. Saving provider settings alone does not commit the preview. |
+| A26 | **Replay line:** the captured cue plays once without an AI request, then playback returns to the prior position and paused/playing state. Stop replay and Hide/Resume restore the prior position; a user seek, source-track change, media replacement, and another window do not receive an unwanted return seek. Verify subtitle delay and speed. |
 
 Automate pure context/conversation/parser/prompt logic and DOM/bridge behavior where practical. Use a local mock streaming endpoint for transport tests. Actual IINA, Keychain, native subtitle coexistence, focus, and fullscreen require real-runtime evidence. Document tests not run and why; mocks are not evidence that native integration works.
 

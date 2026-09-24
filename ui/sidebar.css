@@ -11,6 +11,7 @@ p{overflow-wrap:anywhere}
 .source{flex:none;background:#232c36;border:1px solid #3b4a59;border-radius:10px;padding:11px 13px;margin:8px 0 0}
 .eyebrow{display:block;color:#a8bacb;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px}
 #phrase{display:block;font-size:15px;line-height:1.4;overflow-wrap:anywhere}
+#replay{margin-top:9px;min-height:30px;padding:4px 9px;font-size:12px}
 details{margin-top:7px;color:#b9c9d8}
 summary{cursor:pointer;font-size:12px;width:max-content;max-width:100%}
 details p{margin:7px 0 0;white-space:pre-wrap;font-size:13px;color:#e0e7ed}
