@@ -451,8 +451,11 @@ export class Session {
       if (!this.settings.model) throw new Error('Set an API model in Settings');
       const key = this.settings.noKeyRequired ? null : this.credentials.readForRequest(endpoint.base);
       if (!this.settings.noKeyRequired && !key) throw new Error('Save an API key for this endpoint in Settings');
+      const deepSeekFlash = new URL(endpoint.base).hostname === 'api.deepseek.com' &&
+        this.settings.model === 'deepseek-flash';
       const payload = JSON.stringify({ url: endpoint.requestUrl, key,
-        body: { model: this.settings.model, stream: true, messages: request.messages } });
+        body: { model: this.settings.model, stream: true, messages: request.messages,
+          ...(deepSeekFlash ? { thinking: { type: 'disabled' } } : {}) } });
       const stream = new NativeStream(this.host.raw, this.host.helperPath(), this.host.requestDirectory(++this.nextStreamId),
         payload, record => this.streamRecord(request.owner, record));
       this.active = { owner: request.owner, stream };

@@ -618,10 +618,25 @@ test('request contains frozen neighboring and secondary context, with no key on 
   const payload = JSON.parse(request.slice(request.indexOf('/request:') + 9));
   expect(payload.key).toBeNull();
   expect(payload.url).toBe('http://127.0.0.1:47891/chat/completions');
+  expect(payload.body.thinking).toBeUndefined();
   const prompt = JSON.parse(payload.body.messages[1].content);
   expect(prompt.selected).toBe('öyle');
   expect(prompt.after).toEqual(['Next cue']);
   expect(prompt.secondary).toEqual(['Am I that kind of person?']);
+  player.close();
+});
+
+test('DeepSeek Flash requests disable thinking and use the context prompt', () => {
+  const player = fakePlayer();
+  player.sidebar.get('saveSettings')!({ endpoint: 'https://api.deepseek.com', model: 'deepseek-flash',
+    sourceLanguage: 'Turkish', explanationLanguage: 'English', includeSecondary: true,
+    noKeyRequired: true, key: '' });
+  select(player);
+  player.frames[0]('READY\n'); player.tick();
+  const request = player.writes.find(value => value.includes('/request:'))!;
+  const payload = JSON.parse(request.slice(request.indexOf('/request:') + 9));
+  expect(payload.body.thinking).toEqual({ type: 'disabled' });
+  expect(JSON.parse(payload.body.messages[1].content).task).toContain('Check following cues');
   player.close();
 });
 
