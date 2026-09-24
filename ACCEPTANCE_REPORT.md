@@ -10,6 +10,8 @@ IINA 1.5.0-beta2 has a host setting at **Video → Show Video Panel → Layout �
 
 Checks: `bun test` **43 pass, 0 fail, 229 assertions**; `bun run build` passed TypeScript typechecking and Swift/bundle compilation; packaged helper tests **9 pass**; IINA 0.1.5 archive passed `unzip -t`. `bun run evals .tmp/eval-review.json` still reported **E01–E12 NOT_RUN**, 0/12 passed, because no live model answers have been collected. Automated eval-case tests prove production prompt assembly and grader behavior only.
 
+The new opt-in collector was also exercised with `bun tests/live_eval.ts --mock`: all 12 synthetic requests completed through the packaged Swift helper and the local mock endpoint. That check confirms collection and private-FIFO transport, not the quality of a model answer. The guarded `--live` path was not used.
+
 ## Installed IINA dogfood and eval verdicts (version 0.1.4)
 
 Version 0.1.4 was installed through IINA's **Install Local Package** control in the normal profile. The test used the owner's already open `001 - Leyla ile Mecnun 1. Bölüm.webm` in `Movies/Leyla ile Mecnun`. Before any Explain action, the sidebar showed `http://127.0.0.1:47891`, model `synthetic`, and **This endpoint needs no API key** enabled. Three requests reached only the local mock server, each with `stream: true` and no Authorization header. No DeepSeek or other billable request was made. The movie and its subtitle text were not saved as fixtures or committed.

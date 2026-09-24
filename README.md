@@ -38,7 +38,7 @@ The plugin uses a packaged, per-request Swift executable with `URLSession` for r
 
 Limits: 8 MiB and 50,000 cues per subtitle file; 4,000 characters per cue/selection; 2,000 characters per follow-up; 20 turns; 128 KiB request JSON; 64 KiB answer and SSE event. Exceeding a limit fails visibly. The plugin does not silently drop required neighboring cues or completed turns. No automatic retry or provider switch occurs.
 
-See [the spec](docs/SPEC.md), [implementation plan](IMPLEMENTATION_PLAN.md), [evaluation plan](docs/EVAL_PLAN.md), and [acceptance report](ACCEPTANCE_REPORT.md) for behavior and current verification. `bun test tests/evals.test.ts` checks 12 synthetic request cases and the scoring rules; `bun run evals --template` creates an ignored review worksheet, and `bun run evals .tmp/eval-review.json` gives per-case verdicts after responses are reviewed. No provider key or complete commercial subtitle track is committed. No live model evaluation has run.
+See [the spec](docs/SPEC.md), [implementation plan](IMPLEMENTATION_PLAN.md), [evaluation plan](docs/EVAL_PLAN.md), and [acceptance report](ACCEPTANCE_REPORT.md) for behavior and current verification. `bun test tests/evals.test.ts` checks 12 synthetic request cases and the scoring rules; `bun run evals --template` creates an ignored review worksheet, and `bun run evals .tmp/eval-review.json` gives per-case verdicts after responses are reviewed. `bun tests/live_eval.ts --mock` checks collection through the packaged helper with only a local endpoint. No provider key or complete commercial subtitle track is committed. No live model evaluation has run.
 
 ## Dependencies and provenance
 
