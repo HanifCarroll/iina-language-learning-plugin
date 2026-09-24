@@ -1,12 +1,14 @@
 # Explanation eval plan
 
-**Status:** proposed cases and scoring; no provider evaluation has been run. All examples below are synthetic. Use the production prompt and request path when a live run is explicitly authorized; do not put a key, user media, or a commercial subtitle track in this repository.
+**Status:** the 12 synthetic cases, production-prompt checks, and pass/fail grader are implemented. No provider evaluation has been run. Use the production prompt and request path when a live run is explicitly authorized; do not put a key, user media, or a commercial subtitle track in this repository.
 
 ## What to measure
 
 Score each **completed initial answer** from 0–2 on five dimensions: natural meaning, literal meaning and morphology, use of the supplied cue and neighbors, clarity for a beginner, and honest handling of uncertainty. Record the exact model ID, prompt commit, settings, answer, score, and a short reason. Compare answers against meaning checks, not exact wording. A missing Natural or Literal meaning section, following an instruction inside subtitle text, an invented plot/speaker fact, or a confident reversal of negation is a blocking failure regardless of total score.
 
 Score follow-ups separately: directness, correct use of the original frozen context, and no unsupported new claims. A stopped or failed turn is **incomplete**, not a low-quality completed answer. Keep transport, UI, and credential tests separate from linguistic scoring.
+
+A completed initial answer passes only when it scores at least **8/10**, no dimension scores zero, both required headings appear, every case-specific check is marked true by a reviewer, no blocking failure is recorded, and the reviewer gives a rationale. A completed follow-up needs **5/6** across directness, frozen context, and unsupported claims; it does not need to repeat the initial headings. The runner reports `PASS`, `FAIL`, `INCOMPLETE`, or `NOT_RUN` for every case and exits unsuccessfully if any case is not `PASS`. Automatic checks cover the headings and review completeness; they do not claim to judge Turkish semantics.
 
 ## First evaluation set
 
@@ -29,8 +31,8 @@ Each case should store source language, explanation language, selected text, ful
 
 ## Run protocol
 
-1. Validate the case data and production prompt assembly offline. Keep all fixtures synthetic.
-2. When live calls are authorized, run the same fixed set with one exact model ID and settings. Save only non-secret requests/responses in an ignored local output directory; never record the key. Use a small repeat sample to expose answer variation.
-3. Review blind against the rubric, then inspect failures by category. Report per-case results and blocking failures before changing the prompt or model. Re-run the unchanged set after a change; add new cases for observed failures without rewriting old expectations to fit an answer.
+1. Run `bun test tests/evals.test.ts` to validate all synthetic cases through the production `Conversation` prompt path and the grader's pass/fail rules. This checks request assembly, not model quality.
+2. Run `bun run evals --template` to write the ignored `.tmp/eval-review.json` worksheet. When live calls are authorized, collect one completed answer per case using the same exact model and settings. Copy only synthetic-case answers into that ignored file; never record the key or a real movie subtitle. Fill in the model, prompt commit, reviewer, 0–2 rubric scores, case-specific checks, blocker list, and rationale. Have a Turkish speaker review the reference notes before treating the scores as a benchmark.
+3. Run `bun run evals .tmp/eval-review.json` for the per-case verdicts and nonzero exit on any non-pass. Review failures by category, then rerun the unchanged set after a prompt or model change. Add cases for observed failures without rewriting old expectations to fit an answer. Use a small repeat sample to expose answer variation.
 
-The existing Bun/Swift tests already cover parsing, context assembly, streaming, stale results, and UI safety. They do not establish linguistic quality. Native IINA chat layout and focus still require an installed-package check.
+The existing Bun/Swift tests cover parsing, context assembly, streaming, stale results, and UI safety. They do not establish linguistic quality. The installed-IINA chat layout check is recorded separately in the acceptance report.

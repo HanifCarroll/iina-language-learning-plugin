@@ -3,6 +3,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "bun test",
+    "evals": "bun tests/eval_runner.ts",
     "build": "sh scripts/build.sh"
   },
   "dependencies": {
