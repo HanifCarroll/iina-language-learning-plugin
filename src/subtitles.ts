@@ -57,6 +57,15 @@ export function cueAt(cues: Cue[], mediaMs: number, delayMs = 0, speed = 1): Cue
   return matching.length === 1 ? matching[0] : null;
 }
 
+export function cueForDisplay(cues: Cue[], text: string, startMs: number): Cue | null {
+  if (!text || !Number.isFinite(startMs)) return null;
+
+  // mpv's subtitle timestamp identifies the cue even when IINA's playhead cache lags.
+  // Allow the existing 50 ms tolerance for subtitle decoder timestamp rounding.
+  const matching = cues.filter(cue => cue.text === text && Math.abs(cue.startMs - startMs) <= 50);
+  return matching.length === 1 ? matching[0] : null;
+}
+
 export function contextForCue(source: Cue[], index: number, secondary: Cue[] = [], includeSecondary = true,
   timing: { sourceDelayMs: number; secondaryDelayMs: number; speed: number } =
     { sourceDelayMs: 0, secondaryDelayMs: 0, speed: 1 }) {

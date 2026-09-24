@@ -610,6 +610,36 @@ test('subtitle mismatch restores native source and a later match reclaims it', (
   player.close();
 });
 
+test('natural cue boundaries do not flash native subtitles when the playhead cache lags', () => {
+  const player = fakePlayer();
+  const displayedCue = () => player.overlayPayloads.filter(item => item.name === 'cue').at(-1)?.value;
+
+  // 1. mpv has cleared the cue while the cached playhead is still inside it.
+  player.status.position = 1.95;
+  player.props.set('sub-text', '');
+  player.props.set('sub-start', NaN);
+  player.tick();
+  expect(displayedCue()).toBeNull();
+  expect(player.props.get('sub-visibility')).toBe(false);
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
+
+  // 2. The next native cue arrives before IINA refreshes its cached playhead.
+  player.status.position = 3.95;
+  player.props.set('sub-text', 'Next cue');
+  player.props.set('sub-start', 4);
+  player.tick();
+  expect(displayedCue()).toEqual({ trackId: 1, index: 1, text: 'Next cue' });
+  expect(player.props.get('sub-visibility')).toBe(false);
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
+
+  // 3. A later playhead update keeps the same rendering and cue identity.
+  player.status.position = 4.1;
+  player.tick();
+  expect(player.props.get('sub-visibility')).toBe(false);
+  expect(player.states.at(-1).status).not.toContain('does not match');
+  player.close();
+});
+
 test('request contains frozen neighboring and secondary context, with no key on keyless endpoint', () => {
   const player = fakePlayer();
   select(player);

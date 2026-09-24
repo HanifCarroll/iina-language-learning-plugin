@@ -2,7 +2,7 @@ import { canonicalEndpoint, Credentials } from './credentials';
 import { Conversation, type ContextSnapshot, type RequestOwner } from './conversation';
 import { IinaHost, type RawIina } from './iina-host';
 import { NativeStream, type StreamRecord } from './stream';
-import { contextForCue, cueAt, parseSubtitles, type Cue } from './subtitles';
+import { contextForCue, cueForDisplay, parseSubtitles, type Cue } from './subtitles';
 import type { PendingSelection } from './selection';
 
 declare const iina: RawIina;
@@ -345,11 +345,10 @@ export class Session {
     let cue: Cue | null = null;
     let sourceReady = false;
     if (sourceId !== null && this.source) {
-      cue = cueAt(this.source, this.host.positionMs, this.host.delayMs, this.host.subtitleSpeed);
       const displayed = this.host.displayedSource;
+      cue = cueForDisplay(this.source, displayed, this.host.displayedStartMs);
       const mismatch = 'Subtitle timing or text does not match the selected file.';
-      if (displayed && (!cue || cue.text !== displayed || Math.abs(cue.startMs - this.host.displayedStartMs) > 50)) {
-        cue = null;
+      if (displayed && !cue) {
         this.host.restorePrimary();
         this.host.restoreSecondary();
         if (this.status !== mismatch) { this.status = mismatch; this.render(); }

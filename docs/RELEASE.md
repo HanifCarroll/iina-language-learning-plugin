@@ -1,6 +1,6 @@
 # Release and IINA community-list checklist
 
-The public name is **Neden**. This project has not been pushed, released, or submitted to IINA. The plugin identifier stays `io.github.hanifcarroll.iina-language-learning` so current installations and Keychain items retain their identity.
+The public name is **Neden**. The [source repository](https://github.com/HanifCarroll/iina-language-learning-plugin) is public; no package release or IINA community-list submission has been made. The plugin identifier stays `io.github.hanifcarroll.iina-language-learning` so current installations and Keychain items retain their identity.
 
 ## Package route
 
@@ -9,7 +9,7 @@ The tested IINA 1.5.0-beta2 installer first looks for a `.iinaplgz` asset in the
 ## Before the first public release
 
 1. Confirm that `Info.json`, the README, sidebar text, and the community-list description use **Neden**. Preserve the plugin identifier.
-2. Publish the source repository at the `ghRepo` path in `Info.json`. Until then, its URL and automatic update check are not live.
+2. Publish the source repository at the `ghRepo` path in `Info.json`. The repository is public, but GitHub installation and automatic updates still need a package release and native verification.
 3. Review the full Git history for credentials, private media, and complete commercial subtitle tracks. A local pattern scan of all tracked blobs found no apparent credentials, and the tracked subtitle fixtures are synthetic; this is not a guarantee that every possible secret pattern was found. Review the packaged file list and third-party license notices. Only synthetic fixtures belong in the public repository.
 4. In a clean checkout on the tested macOS/IINA setup, run `bun install --frozen-lockfile` and `bun run release:check`. Upload the resulting current-version archive as the **only** `.iinaplgz` asset in the latest GitHub release.
 5. Install that release through IINA's **Install from GitHub** control in a clean profile. Check first-run permissions, menu and sidebar loading, external SRT/VTT selection, local mock streaming, Stop, Hide/Resume, native subtitle restoration, and update detection. Use no real credential or billable endpoint.

@@ -1,5 +1,15 @@
 import { test, expect } from 'bun:test';
-import { parseSubtitles, cueAt, contextForCue } from '../src/subtitles';
+import { parseSubtitles, cueAt, cueForDisplay, contextForCue } from '../src/subtitles';
+
+test('displayed cue uses its subtitle timestamp and rejects ambiguous or unrelated text', () => {
+  const cues = parseSubtitles('1\n00:00:01,234 --> 00:00:02,000\nSame\n\n2\n00:00:04,000 --> 00:00:06,000\nSame', 'srt');
+  expect(cueForDisplay(cues, 'Same', 1230)?.index).toBe(0);
+  expect(cueForDisplay(cues, 'Same', 4000)?.index).toBe(1);
+  expect(cueForDisplay(cues, 'Same', 3000)).toBeNull();
+  expect(cueForDisplay(cues, 'Different', 4000)).toBeNull();
+  expect(cueForDisplay(cues, '', NaN)).toBeNull();
+  expect(cueForDisplay([...cues, { ...cues[1], index: 2 }], 'Same', 4000)).toBeNull();
+});
 
 test('full future timeline, timing, repeated text, and secondary overlap', () => {
   const source = parseSubtitles('\uFEFF1\r\n00:00:00,000 --> 00:00:02,000\r\nBen öyle\r\nbir insan mıyım?\r\n\r\n2\r\n00:00:04,000 --> 00:00:06,000\r\nSame\r\n\r\n3\r\n00:00:08,000 --> 00:00:10,000\r\nSame\r\n\r\n4\r\n00:00:12,000 --> 00:00:14,000\r\nEnd\r\n', 'srt');
