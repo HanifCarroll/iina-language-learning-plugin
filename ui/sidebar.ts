@@ -23,6 +23,14 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   let renderedConversationId: number | null = null;
   let renderedAnswers: string[] = [];
 
+  function resizeQuestion(): void {
+    const turns = element('turns');
+    const atBottom = turns.scrollHeight - turns.scrollTop - turns.clientHeight < 48;
+    question.style.height = 'auto';
+    question.style.height = `${Math.max(38, Math.min(question.scrollHeight, 78))}px`;
+    if (atBottom) turns.scrollTop = turns.scrollHeight;
+  }
+
   function render(): void {
     if (!state) return;
     const busy = state.turns.at(-1)?.status === 'streaming';
@@ -33,29 +41,36 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     element('settingsToggle').hidden = settingsOpen;
     element('conversation').hidden = !state.open || settingsOpen;
     element('settings').hidden = !settingsOpen;
-    if (renderedConversationId !== state.conversationId) {
+    const conversationChanged = renderedConversationId !== state.conversationId;
+    if (conversationChanged) {
       renderedConversationId = state.conversationId;
       renderedAnswers = [];
       element('turns').replaceChildren();
       question.value = '';
+      resizeQuestion();
       element<HTMLDetailsElement>('fullCue').open = false;
     }
     if (element('phrase').textContent !== state.phrase) element('phrase').textContent = state.phrase;
     if (element('sourceCue').textContent !== state.cue) element('sourceCue').textContent = state.cue;
     element('fullCue').hidden = state.phrase.trim() === state.cue.trim();
     const turns = element('turns');
-    const stickToBottom = turns.childElementCount > 0 && turns.scrollHeight - turns.scrollTop - turns.clientHeight < 48;
+    const newTurn = !conversationChanged && turns.childElementCount > 0 && state.turns.length > turns.childElementCount;
+    const stickToBottom = newTurn || (turns.childElementCount > 0 && turns.scrollHeight - turns.scrollTop - turns.clientHeight < 48);
     state.turns.forEach((turn, index) => {
       let card = turns.children[index] as HTMLElement | undefined;
       if (!card) {
         card = doc.createElement('article'); card.className = 'turn';
         if (turn.question) {
-          const title = doc.createElement('h3'); title.textContent = turn.question;
-          card.append(title);
+          const user = doc.createElement('div'); user.className = 'user-message';
+          const label = doc.createElement('span'); label.className = 'message-label'; label.textContent = 'You';
+          const text = doc.createElement('p'); text.textContent = turn.question;
+          user.append(label, text); card.append(user);
         }
+        const assistant = doc.createElement('div'); assistant.className = 'assistant-message';
+        const label = doc.createElement('span'); label.className = 'message-label'; label.textContent = 'Explanation';
         const answer = doc.createElement('div'); answer.className = 'answer';
         const turnStatus = doc.createElement('small'); turnStatus.className = 'turn-status';
-        card.append(answer, turnStatus); turns.append(card);
+        assistant.append(label, answer, turnStatus); card.append(assistant); turns.append(card);
       }
       const answer = card.querySelector<HTMLElement>('.answer')!;
       if (renderedAnswers[index] !== turn.answer) {
@@ -87,9 +102,10 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
 
   function sendQuestion(): void {
     const value = question.value.trim();
-    if (!value) return;
+    if (!value || !state?.open || state.turns.at(-1)?.status === 'streaming') return;
     bridge.postMessage('followUp', { question: value });
     question.value = '';
+    resizeQuestion();
   }
 
   element('settingsToggle').addEventListener('click', () => { settingsOpen = true; bridge.postMessage('settingsView', { open: true }); render(); });
@@ -118,6 +134,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); sendQuestion(); }
   });
   question.addEventListener('keyup', event => event.stopPropagation());
+  question.addEventListener('input', resizeQuestion);
   bridge.onMessage('state', encoded => {
     try {
       const next: unknown = JSON.parse(decodeURIComponent(encoded));

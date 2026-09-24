@@ -18,7 +18,7 @@ python3 tests/test_stream_helper.py dist/io.github.hanifcarroll.iina-language-le
 /Applications/IINA.app/Contents/MacOS/iina-plugin pack dist/io.github.hanifcarroll.iina-language-learning.iinaplugin
 ```
 
-The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored `.iinaplugin` folder under `dist/`. IINA's bundled packer writes an ignored `.iinaplgz` archive in the current directory. Install the archive through IINA's plugin settings. Version 0.1.2 initializes in an already loaded player window; if an older installation shows an empty Language Learning sidebar after installation, quit IINA fully and reopen the movie. The project does not modify IINA itself.
+The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored `.iinaplugin` folder under `dist/`. IINA's bundled packer writes an ignored `.iinaplgz` archive in the current directory. Install the archive through IINA's plugin settings. Version 0.1.3 initializes in an already loaded player window; if an older installation shows an empty Language Learning sidebar after installation, quit IINA fully and reopen the movie. The project does not modify IINA itself.
 
 ## Use
 
@@ -26,7 +26,7 @@ The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored 
 2. Open the Language Learning sidebar and enter an HTTPS API base URL and model. The plugin appends `/chat/completions`. HTTP is accepted only for `localhost`, `127.0.0.1`, or `::1` test endpoints. Enter an API key unless the endpoint needs none. Save settings before selecting text. A newly entered key goes directly to the plugin's verified IINA Keychain API; saved keys are never shown in the sidebar.
 3. Select a word or phrase in the source subtitle. Selection alone does not pause or send a request. Click **Explain with AI** to pause playback and open the conversation. Send follow-ups from the same sidebar. **Stop** marks partial output incomplete; **Retry** manually starts a new request for that turn. **Close/Resume** closes the conversation and resumes eligible playback of the same media.
 
-Changing provider, language, or secondary-context settings ends an open conversation; make a fresh selection to use the new settings. The secondary subtitle remains visible even when its text is omitted from AI context. The sidebar formats model Markdown locally with HTML, links, and image loading disabled. The complete source cue is available through **Full subtitle line**; subtitle content remains plain text.
+Changing provider, language, or secondary-context settings ends an open conversation; make a fresh selection to use the new settings. The secondary subtitle remains visible even when its text is omitted from AI context. The sidebar formats model Markdown locally with HTML, links, and image loading disabled. The complete source cue is available through **Full subtitle line**; subtitle content remains plain text. The follow-up input grows to three lines, while the message list scrolls above it. A new follow-up scrolls into view; streaming follows the bottom unless you scroll up to read.
 
 **Disable Overlay** in plugin Settings is the supported safe shutdown control. It cancels active work, closes the conversation under the same-media resume rule, and restores the native primary subtitle state owned by that window. Raw disable in IINA Preferences does not call plugin cleanup in IINA 1.5.0-beta2. In that case a helper can run until its 120-second total timeout, native primary subtitles can remain hidden, and playback can remain paused. Recover with **Subtitles → Show Subtitles** and, if needed, **Playback → Resume**. A request may still be billable after raw disable.
 
@@ -36,7 +36,7 @@ The plugin uses a packaged, per-request Swift executable with `URLSession` for r
 
 Limits: 8 MiB and 50,000 cues per subtitle file; 4,000 characters per cue/selection; 2,000 characters per follow-up; 20 turns; 128 KiB request JSON; 64 KiB answer and SSE event. Exceeding a limit fails visibly. The plugin does not silently drop required neighboring cues or completed turns. No automatic retry or provider switch occurs.
 
-See [the spec](docs/SPEC.md), [implementation plan](IMPLEMENTATION_PLAN.md), and [acceptance report](ACCEPTANCE_REPORT.md) for behavior and current verification. Synthetic fixtures and controlled local endpoints are used in tests. No provider key or complete commercial subtitle track is committed.
+See [the spec](docs/SPEC.md), [implementation plan](IMPLEMENTATION_PLAN.md), [evaluation plan](docs/EVAL_PLAN.md), and [acceptance report](ACCEPTANCE_REPORT.md) for behavior and current verification. Synthetic fixtures and controlled local endpoints are used in tests. No provider key or complete commercial subtitle track is committed. The evaluation cases are proposals; no live model evaluation has run.
 
 ## Dependencies and provenance
 

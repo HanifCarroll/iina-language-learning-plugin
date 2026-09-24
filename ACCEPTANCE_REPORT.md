@@ -10,6 +10,16 @@ The revised sidebar was visually checked in a 470 px browser preview with synthe
 
 For 0.1.2, `bun test` passed 28 tests with 129 assertions, `bun run build` passed TypeScript typechecking and bundling, and IINA's packer created an archive that passed `unzip -t`. The archive contains the Swift helper and bundled Markdown dependency notices. A preview file was briefly present in the build folder during visual testing; the build now clears that folder before packaging, and the final archive was checked to exclude it.
 
+## Chat UX update and proposed evals (version 0.1.3)
+
+The composer now starts at one line, grows to three, and scrolls internally after that. Follow-up questions appear as separate user messages. A new follow-up scrolls the message list to the bottom; streamed text follows only while the reader is near the bottom. The composer and its controls remain visible below the message list. Sending while a response is active keeps the draft and starts no second request. Enter, Shift+Enter, and composition handling remain distinct.
+
+DOM tests cover growth, the three-line cap, new-turn scrolling, manual-scroll preservation, busy-send rejection, and inert user-message text. A synthetic browser preview at 470 px and 320 px showed the composer at the bottom; typing four lines left the input at three visible lines, and Enter displayed the new question above a streaming reply. This is browser layout evidence, not an installed-IINA test. The normal IINA configuration and real provider were untouched.
+
+The proposed linguistic evaluation set and scoring rubric are in [docs/EVAL_PLAN.md](docs/EVAL_PLAN.md). No provider evaluation has been run, and the Turkish reference notes still need language review before use as a benchmark.
+
+For 0.1.3, `bun test` passed 29 tests with 144 assertions, and `bun run build` passed TypeScript typechecking, Swift compilation, and bundling. IINA's packer created the 0.1.3 archive; `unzip -t` passed, and its member list includes the Swift helper and Markdown notices but no browser preview file. The updated package has not been installed in IINA.
+
 ## Environment and levels of evidence
 
 - **Installed product:** version 0.1.0 was installed through IINA's **Install Local Package** control in a fresh isolated profile at `/tmp/iina-final-install-isolated`. IINA 1.5.0-beta2 build 172 restarted and loaded that installed copy on macOS 27 arm64 with bundled mpv 0.41.0. The permission dialog showed the documented `file-system` and `video-overlay` permissions. At that point the normal IINA profile was not modified. The later 0.1.1 late-install fix has automated coverage but has not yet had an installed-IINA retest.

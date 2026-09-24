@@ -54,10 +54,10 @@ test('sidebar formats a real explanation, keeps source context available, and do
   expect(window.document.querySelector('details')?.hasAttribute('open')).toBe(false);
   expect(window.document.querySelector('#status')?.hasAttribute('hidden')).toBe(true);
   const answer = window.document.querySelector('.answer');
-  (window.document.querySelector('#question') as HTMLTextAreaElement).value = 'A question I am drafting';
+  (window.document.querySelector('#question') as unknown as HTMLTextAreaElement).value = 'A question I am drafting';
   state('**Natural meaning**  \nBy now...\n\n**Literal meaning**  \nUntil today...\n\n- **bitirir** = finishes', 'Complete');
   expect(window.document.querySelector('.answer')).toBe(answer);
-  expect((window.document.querySelector('#question') as HTMLTextAreaElement).value).toBe('A question I am drafting');
+  expect((window.document.querySelector('#question') as unknown as HTMLTextAreaElement).value).toBe('A question I am drafting');
   expect(window.document.querySelector('.turn-status')?.hasAttribute('hidden')).toBe(true);
   state('A new answer', 'Complete', 2);
   expect(window.document.querySelector('.answer')).not.toBe(answer);
@@ -83,5 +83,64 @@ test('model Markdown cannot create HTML, links, or image requests', async () => 
   expect(window.document.querySelector('.answer')?.textContent).toContain('<script>bad()</script>');
   expect(window.document.querySelector('.answer')?.textContent).toContain('alt');
   expect(window.document.querySelector('.answer strong')?.textContent).toBe('safe');
+  window.happyDOM.abort();
+});
+
+test('chat composer grows to three lines and message scrolling follows new replies without stealing reading position', async () => {
+  const window = new Window();
+  (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;
+  window.document.body.innerHTML = (await Bun.file('ui/sidebar.html').text()).split('<body>')[1].split('</body>')[0];
+  const handlers = new Map<string, (data: string) => void>();
+  const sent: Array<{ name: string; data: unknown }> = [];
+  mountSidebar(window.document as unknown as Document, {
+    onMessage: (name, callback) => { handlers.set(name, callback); },
+    postMessage: (name, data) => sent.push({ name, data })
+  });
+  const turns = window.document.querySelector('#turns') as unknown as HTMLElement;
+  const question = window.document.querySelector('#question') as unknown as HTMLTextAreaElement;
+  let height = 800;
+  Object.defineProperty(turns, 'scrollHeight', { get: () => height });
+  Object.defineProperty(turns, 'clientHeight', { get: () => 100 });
+  Object.defineProperty(question, 'scrollHeight', { get: () => 38 + (question.value.match(/\n/g)?.length ?? 0) * 20 });
+  const initial = { question: '', answer: '**Natural meaning**\nHello', status: 'complete' };
+  const followUp = { question: '<img src=x> Why?', answer: '', status: 'streaming' };
+  const state = (items: typeof initial[], status = 'Complete') => handlers.get('state')!(encodeURIComponent(JSON.stringify({
+    status, open: true, conversationId: 1, overlayEnabled: true, phrase: 'hello', cue: 'hello', turns: items,
+    settings: { endpoint: '', model: '', sourceLanguage: 'Turkish', explanationLanguage: 'English',
+      includeSecondary: true, noKeyRequired: false, hasSavedKey: false, requestUrl: '' }
+  })));
+  state([initial]);
+  expect(turns.scrollTop).toBe(0); // opening an existing long answer starts at its beginning
+  question.value = 'one\ntwo\nthree\nfour';
+  question.dispatchEvent(new window.Event('input') as unknown as Event);
+  expect(question.style.height).toBe('78px');
+  question.value = 'one';
+  question.dispatchEvent(new window.Event('input') as unknown as Event);
+  expect(question.style.height).toBe('38px');
+  const newline = new window.KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, cancelable: true });
+  question.dispatchEvent(newline as unknown as Event);
+  expect(newline.defaultPrevented).toBe(false);
+  const composing = new window.KeyboardEvent('keydown', { key: 'Enter', isComposing: true, cancelable: true });
+  question.dispatchEvent(composing as unknown as Event);
+  expect(composing.defaultPrevented).toBe(false);
+  expect(sent.filter(item => item.name === 'followUp')).toHaveLength(0);
+  (window.document.querySelector('#send') as unknown as HTMLButtonElement).click();
+  expect(sent.at(-1)).toEqual({ name: 'followUp', data: { question: 'one' } });
+  expect(question.value).toBe('');
+  state([initial, followUp], 'Generating…');
+  expect(turns.scrollTop).toBe(800); // a newly sent question is brought into view
+  expect(window.document.querySelector('.user-message')?.textContent).toContain('<img src=x> Why?');
+  expect(window.document.querySelector('.user-message img')).toBeNull();
+  question.value = 'Keep this draft';
+  question.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', cancelable: true }) as unknown as Event);
+  expect(sent.filter(item => item.name === 'followUp')).toHaveLength(1);
+  expect(question.value).toBe('Keep this draft');
+  turns.scrollTop = 0;
+  height = 1200;
+  state([initial, { ...followUp, answer: 'Partial reply' }], 'Generating…');
+  expect(turns.scrollTop).toBe(0); // reading older content is not interrupted by streamed chunks
+  turns.scrollTop = 1100;
+  state([initial, { ...followUp, answer: 'Partial reply continues' }], 'Generating…');
+  expect(turns.scrollTop).toBe(1200);
   window.happyDOM.abort();
 });

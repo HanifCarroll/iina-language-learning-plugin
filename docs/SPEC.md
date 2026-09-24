@@ -84,6 +84,8 @@ Display the selected phrase, its complete source cue, an optional timestamp, str
 
 Use one conversation view, not separate explanation and chat products. Keep the selected phrase identifiable while scrolling. Enter submits; Shift+Enter inserts a newline, respecting text-composition input. Typing spaces or using the Explain shortcut in a text input must not inadvertently control playback.
 
+Keep the composer and its controls visible at the bottom of an open conversation. Start the input at one line, grow it to three lines, then scroll inside it. Messages scroll independently above the composer. Bring a newly sent follow-up into view and follow incoming text while the reader is near the bottom; if the reader scrolls up, preserve that reading position through stream updates.
+
 The initial explanation should visibly distinguish **Natural meaning** and **Literal meaning**. Other sections may be compact rather than elaborate cards. Render safe Markdown or plain text; no arbitrary HTML from subtitles or model output.
 
 ### Dual-subtitle presentation

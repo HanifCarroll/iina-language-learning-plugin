@@ -14,10 +14,13 @@ p{overflow-wrap:anywhere}
 details{margin-top:7px;color:#b9c9d8}
 summary{cursor:pointer;font-size:12px;width:max-content;max-width:100%}
 details p{margin:7px 0 0;white-space:pre-wrap;font-size:13px;color:#e0e7ed}
-#turns{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:grid;align-content:start;gap:18px;padding:18px 2px 24px;margin:0 -2px}
-.turn{min-width:0;overflow-wrap:anywhere}
-.turn + .turn{border-top:1px solid #37424f;padding-top:18px}
-.turn h3{font-size:13px;color:#a8cfee;margin:0 0 8px}
+#turns{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:grid;align-content:start;gap:22px;padding:18px 2px 24px;margin:0 -2px}
+.turn{min-width:0;display:flex;flex-direction:column;gap:16px;overflow-wrap:anywhere}
+.user-message{align-self:flex-end;max-width:90%;background:#2c435a;border:1px solid #49647d;border-radius:12px 12px 3px 12px;padding:9px 12px;white-space:pre-wrap}
+.user-message p{margin:3px 0 0}
+.assistant-message{min-width:0}
+.message-label{display:block;color:#a8cfee;font-size:12px;font-weight:700;margin-bottom:7px}
+.user-message .message-label{color:#c8def0;margin:0}
 .answer{color:#edf1f5;line-height:1.55;user-select:text}
 .answer :first-child{margin-top:0}
 .answer :last-child{margin-bottom:0}
@@ -44,7 +47,7 @@ button:disabled{opacity:.5;cursor:default}
 .row{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
 label{display:block;margin:12px 0 4px}
 input:not([type=checkbox]),textarea{display:block;width:100%;padding:8px 10px;background:#232c36;border:1px solid #607183;border-radius:6px;color:#fff}
-textarea{resize:vertical;max-height:35vh;min-height:64px}
+textarea{line-height:20px;resize:none;overflow-y:auto;min-height:38px;max-height:78px}
 textarea::placeholder{color:#a1aebb}
 .checkbox{display:flex;gap:8px;align-items:center}
 .notice{font-size:12px;color:#c7d0da}
