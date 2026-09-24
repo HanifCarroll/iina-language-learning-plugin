@@ -44,7 +44,7 @@ class Mock(http.server.BaseHTTPRequestHandler):
             return
         parts = ["Ön", "ce", " —", " gerçek", " akış"]
         if self.path == "/chat/completions":
-            parts = (["**Follow-up**\n", "This is a synthetic reply ", "to test the chat layout."]
+            parts = (["This is a synthetic reply ", "to test the chat layout."]
                      if len(request.get("messages", [])) > 2 else
                      ["**Natural meaning**\n", "A synthetic explanation for the selected phrase.\n\n",
                       "**Literal meaning**\n", "A synthetic word-by-word gloss.\n\n",

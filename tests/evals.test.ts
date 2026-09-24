@@ -16,6 +16,7 @@ for (const item of evalCases) {
     expect(messages[0].content).not.toContain(item.cue);
     if (item.question) {
       expect(messages.map(message => message.role)).toEqual(['system', 'user', 'assistant', 'user']);
+      expect(messages[0].content).toContain('Answer follow-up questions directly');
       expect(messages.at(-1)?.content).toBe(item.question);
       expect(messages[2].content).toBe(item.priorAnswer!);
     } else expect(messages).toHaveLength(2);

@@ -1,7 +1,7 @@
 {
   "name": "IINA Language Learning",
   "identifier": "io.github.hanifcarroll.iina-language-learning",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "author": { "name": "Hanif Carroll" },
   "entry": "main.js",
   "sidebarTab": { "name": "Language Learning" },

@@ -1,6 +1,14 @@
 # Product acceptance evidence
 
-**Status (2026-09-24):** the approved MVP and the 0.1.4 chat/eval update have been tested locally. This is not a release or a claim that all A01–A24 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
+**Status (2026-09-24):** the approved MVP and the 0.1.5 chat update have been tested locally. This is not a release or a claim that all A01–A24 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
+
+## Installed IINA chat-label and sidebar check (version 0.1.5)
+
+The sidebar added an `Explanation` label to every assistant turn. The local mock server also prefixed follow-up answers with `**Follow-up**`; together these made the same role labels appear repeatedly. Version 0.1.5 removes the assistant label and the mock-only follow-up heading. The model still controls any headings inside its own answer; the initial prompt asks for Natural and Literal meaning sections.
+
+IINA 1.5.0-beta2 has a host setting at **Video → Show Video Panel → Layout → Sidebar Position → Plugins**. Setting Plugins to the trailing side moved Language Learning to the right in the owner's installed IINA. This setting applies to all plugin sidebars. With the already open Leyla ile Mecnun video, the installed 0.1.5 package displayed one local streamed explanation and one follow-up without either duplicate label. The composer remained at the bottom. Two requests reached only the loopback mock server, with `stream: true` and no Authorization header; no provider call was made. The prior DeepSeek URL, model, key-required state, and saved-key status were restored afterward, and the movie was left paused at 01:22. The screenshot is an ignored local file at `dist/evidence/iina-0.1.5-right-sidebar.png` and contains a frame of the owner's movie; it is not committed.
+
+Checks: `bun test` **43 pass, 0 fail, 229 assertions**; `bun run build` passed TypeScript typechecking and Swift/bundle compilation; packaged helper tests **9 pass**; IINA 0.1.5 archive passed `unzip -t`. `bun run evals .tmp/eval-review.json` still reported **E01–E12 NOT_RUN**, 0/12 passed, because no live model answers have been collected. Automated eval-case tests prove production prompt assembly and grader behavior only.
 
 ## Installed IINA dogfood and eval verdicts (version 0.1.4)
 

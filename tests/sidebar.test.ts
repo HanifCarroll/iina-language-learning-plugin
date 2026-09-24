@@ -49,6 +49,7 @@ test('sidebar formats a real explanation, keeps source context available, and do
   })));
   state('**Natural meaning**  \nBy now...\n\n**Literal meaning**  \nUntil today...\n\n- **bitirir** = finishes', 'Generating…');
   expect(window.document.querySelectorAll('.answer strong')).toHaveLength(3);
+  expect(window.document.querySelector('.assistant-message .message-label')).toBeNull();
   expect(window.document.querySelectorAll('.answer li')).toHaveLength(1);
   expect(window.document.querySelector('#fullCue')?.textContent).toContain('...bugüne kadar');
   expect(window.document.querySelector('details')?.hasAttribute('open')).toBe(false);
@@ -128,6 +129,7 @@ test('chat composer grows to three lines and message scrolling follows new repli
   expect(sent.at(-1)).toEqual({ name: 'followUp', data: { question: 'one' } });
   expect(question.value).toBe('');
   state([initial, followUp], 'Generating…');
+  expect(window.document.querySelectorAll('.assistant-message .message-label')).toHaveLength(0);
   expect(turns.scrollTop).toBe(800); // a newly sent question is brought into view
   expect(window.document.querySelector('.user-message')?.textContent).toContain('<img src=x> Why?');
   expect(window.document.querySelector('.user-message img')).toBeNull();

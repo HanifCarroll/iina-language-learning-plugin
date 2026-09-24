@@ -67,10 +67,9 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
           user.append(label, text); card.append(user);
         }
         const assistant = doc.createElement('div'); assistant.className = 'assistant-message';
-        const label = doc.createElement('span'); label.className = 'message-label'; label.textContent = 'Explanation';
         const answer = doc.createElement('div'); answer.className = 'answer';
         const turnStatus = doc.createElement('small'); turnStatus.className = 'turn-status';
-        assistant.append(label, answer, turnStatus); card.append(assistant); turns.append(card);
+        assistant.append(answer, turnStatus); card.append(assistant); turns.append(card);
       }
       const answer = card.querySelector<HTMLElement>('.answer')!;
       if (renderedAnswers[index] !== turn.answer) {

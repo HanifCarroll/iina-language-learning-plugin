@@ -18,7 +18,7 @@ python3 tests/test_stream_helper.py dist/io.github.hanifcarroll.iina-language-le
 /Applications/IINA.app/Contents/MacOS/iina-plugin pack dist/io.github.hanifcarroll.iina-language-learning.iinaplugin
 ```
 
-The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored `.iinaplugin` folder under `dist/`. IINA's bundled packer writes an ignored `.iinaplgz` archive in the current directory. Install the archive through IINA's plugin settings. Version 0.1.4 initializes in an already loaded player window; if the Language Learning sidebar is temporarily empty after reinstalling, reopen it or restart IINA. The project does not modify IINA itself.
+The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored `.iinaplugin` folder under `dist/`. IINA's bundled packer writes an ignored `.iinaplgz` archive in the current directory. Install the archive through IINA's plugin settings. Version 0.1.5 initializes in an already loaded player window; if the Language Learning sidebar is temporarily empty after reinstalling, reopen it or restart IINA. The project does not modify IINA itself.
 
 ## Use
 
@@ -27,6 +27,8 @@ The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored 
 3. Select a word or phrase in the source subtitle. Selection alone does not pause or send a request. Click **Explain with AI** to pause playback and open the conversation. Send follow-ups from the same sidebar. **Stop** marks partial output incomplete; **Retry** manually starts a new request for that turn. **Close/Resume** closes the conversation and resumes eligible playback of the same media.
 
 Changing provider, language, or secondary-context settings ends an open conversation; make a fresh selection to use the new settings. The secondary subtitle remains visible even when its text is omitted from AI context. The sidebar formats model Markdown locally with HTML, links, and image loading disabled. The complete source cue is available through **Full subtitle line**; subtitle content remains plain text. The follow-up input grows to three lines, while the message list scrolls above it. A new follow-up scrolls into view; streaming follows the bottom unless you scroll up to read.
+
+To put the plugin sidebar on the right in IINA 1.5.0-beta2, open **Video → Show Video Panel → Layout → Sidebar Position** and select the trailing side for **Plugins**. This is an IINA setting for all plugin sidebars, not a setting of this plugin alone.
 
 **Disable Overlay** in plugin Settings is the supported safe shutdown control. It cancels active work, closes the conversation under the same-media resume rule, and restores the native primary subtitle state owned by that window. Raw disable in IINA Preferences does not call plugin cleanup in IINA 1.5.0-beta2. In that case a helper can run until its 120-second total timeout, native primary subtitles can remain hidden, and playback can remain paused. Recover with **Subtitles → Show Subtitles** and, if needed, **Playback → Resume**. A request may still be billable after raw disable.
 
