@@ -31,6 +31,10 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
   expect(sent.at(-1)?.name).toBe('saveSettings');
   expect(sent.at(-1)?.data.key).toBe('new-fixture-value');
   expect(window.document.body.textContent).not.toContain('new-fixture-value');
+  const close = window.document.querySelector('header #close') as unknown as HTMLButtonElement;
+  expect(close.getAttribute('aria-label')).toBe('Close sidebar');
+  close.click();
+  expect(sent.at(-1)).toEqual({ name: 'close', data: {} });
   window.happyDOM.abort();
 });
 
@@ -201,7 +205,7 @@ test('model Markdown cannot create HTML, links, or image requests', async () => 
   window.happyDOM.abort();
 });
 
-test('chat composer grows to three lines and message scrolling follows new replies without stealing reading position', async () => {
+test('chat composer grows to three lines and streamed answers do not move the message list', async () => {
   const window = new Window();
   (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;
   window.document.body.innerHTML = (await Bun.file('ui/sidebar.html').text()).split('<body>')[1].split('</body>')[0];
@@ -257,6 +261,6 @@ test('chat composer grows to three lines and message scrolling follows new repli
   expect(turns.scrollTop).toBe(0); // reading older content is not interrupted by streamed chunks
   turns.scrollTop = 1100;
   state([initial, { ...followUp, answer: 'Partial reply continues' }], 'Generating…');
-  expect(turns.scrollTop).toBe(1200);
+  expect(turns.scrollTop).toBe(1100);
   window.happyDOM.abort();
 });

@@ -158,7 +158,7 @@ export class Session {
     sidebar.onMessage('stop', () => this.stop());
     sidebar.onMessage('retry', () => this.retry());
     sidebar.onMessage('replayCue', () => this.toggleReplay());
-    sidebar.onMessage('close', () => this.hideConversation());
+    sidebar.onMessage('close', () => this.dismissSidebar());
     sidebar.onMessage('disableOverlay', () => this.disableOverlay());
     sidebar.onMessage('enableOverlay', () => this.enableOverlay());
     sidebar.onMessage('saveSettings', value => this.saveSettings(value));
@@ -535,6 +535,17 @@ export class Session {
     if (resume && resume.epoch === this.mediaEpoch && resume.url === this.host.mediaUrl && this.host.playable) this.host.resume();
     this.status = 'Conversation saved in this window.';
     this.render();
+  }
+
+  private dismissSidebar(): void {
+    this.discardAppearancePreview();
+    if (this.conversation) {
+      this.hideConversation();
+      return;
+    }
+
+    this.sidebarVisible = false;
+    this.host.hideSidebar();
   }
 
   private closeConversation(): void {

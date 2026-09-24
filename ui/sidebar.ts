@@ -118,7 +118,6 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     element('fullCue').hidden = state.phrase.trim() === state.cue.trim();
     const turns = element('turns');
     const newTurn = !conversationChanged && turns.childElementCount > 0 && state.turns.length > turns.childElementCount;
-    const stickToBottom = newTurn || (turns.childElementCount > 0 && turns.scrollHeight - turns.scrollTop - turns.clientHeight < 48);
     state.turns.forEach((turn, index) => {
       let card = turns.children[index] as HTMLElement | undefined;
       if (!card) {
@@ -147,7 +146,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       turns.lastElementChild?.remove();
       renderedAnswers.pop();
     }
-    if (stickToBottom) turns.scrollTop = turns.scrollHeight;
+    if (newTurn) turns.scrollTop = turns.scrollHeight;
     element<HTMLButtonElement>('send').disabled = !!busy;
     element('stop').hidden = !busy;
     element('retry').hidden = !['failed', 'incomplete'].includes(state.turns.at(-1)?.status ?? '');

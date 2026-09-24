@@ -3,7 +3,7 @@
 <head><meta charset="utf-8"><link rel="stylesheet" href="sidebar.css"></head>
 <body>
 <main>
-  <header><h1>Neden</h1></header>
+  <header><h1>Neden</h1><button id="close" type="button" aria-label="Close sidebar" title="Close sidebar">×</button></header>
   <nav aria-label="Neden views">
     <button id="chatTab" type="button">Chat</button>
     <button id="subtitlesTab" type="button">Subtitles</button>
@@ -22,11 +22,10 @@
       <div class="composer">
         <label for="question">Ask a follow-up</label>
         <textarea id="question" rows="1" maxlength="2000" placeholder="What would you like to know?"></textarea>
-        <div class="row">
-          <button id="send" type="button">Send</button>
+        <div class="row composer-actions">
           <button id="stop" type="button" hidden>Stop generating</button>
           <button id="retry" type="button" hidden>Retry</button>
-          <button id="close" type="button">Hide / Resume</button>
+          <button id="send" type="button">Send</button>
         </div>
       </div>
     </section>
@@ -34,13 +33,19 @@
 
   <section id="subtitlesView" aria-label="Subtitles" hidden>
     <h2>Subtitle tracks</h2>
-    <label for="sourceTrack">Source subtitle</label>
-    <select id="sourceTrack"></select>
-    <p class="hint">Select an external SRT or VTT track to explain its text.</p>
-    <label for="secondaryTrack">Secondary subtitle</label>
-    <select id="secondaryTrack"></select>
-    <p id="subtitleOrder" class="hint">Secondary above source</p>
-    <button id="swapSubtitleOrder" type="button">Swap subtitle positions</button>
+    <div class="form-group">
+      <label for="sourceTrack">Source subtitle</label>
+      <select id="sourceTrack"></select>
+      <p class="hint">Choose an external SRT or VTT track to explain.</p>
+    </div>
+    <div class="form-group">
+      <label for="secondaryTrack">Secondary subtitle</label>
+      <select id="secondaryTrack"></select>
+    </div>
+    <div class="subtitle-order-row">
+      <p id="subtitleOrder" class="hint">Secondary above source</p>
+      <button id="swapSubtitleOrder" class="quiet-button" type="button">Swap positions</button>
+    </div>
     <button id="addSubtitleFile" type="button">Add SRT/VTT file…</button>
 
     <details id="appearanceControls">
@@ -62,16 +67,25 @@
   </section>
 
   <section id="aiView" aria-label="AI settings" hidden>
-    <h2>AI settings</h2>
-    <label>API base URL<input id="endpoint" type="url" autocomplete="off" placeholder="https://provider.example/v1"></label>
-    <p id="requestUrl" class="hint"></p>
-    <label>Model<input id="model" type="text" autocomplete="off"></label>
-    <label>Source language<input id="sourceLanguage" type="text"></label>
-    <label>Explanation language<input id="explanationLanguage" type="text"></label>
-    <label class="checkbox"><input id="includeSecondary" type="checkbox">Include secondary subtitle text in AI context</label>
-    <label class="checkbox"><input id="noKeyRequired" type="checkbox">This endpoint needs no API key</label>
-    <label>API key (save or replace)<input id="apiKey" type="password" autocomplete="new-password"></label>
-    <p id="keyStatus" class="hint"></p>
+    <section class="settings-group" aria-labelledby="connectionHeading">
+      <h2 id="connectionHeading">Connection</h2>
+      <label>API base URL<input id="endpoint" type="url" autocomplete="off" placeholder="https://provider.example/v1"></label>
+      <p id="requestUrl" class="hint"></p>
+      <label>Model<input id="model" type="text" autocomplete="off"></label>
+    </section>
+    <section class="settings-group" aria-labelledby="languagesHeading">
+      <h2 id="languagesHeading">Languages</h2>
+      <label>Source language<input id="sourceLanguage" type="text"></label>
+      <label>Explanation language<input id="explanationLanguage" type="text"></label>
+      <label class="checkbox"><input id="includeSecondary" type="checkbox">Include secondary subtitle text in AI context</label>
+    </section>
+    <section class="settings-group" aria-labelledby="keyHeading">
+      <h2 id="keyHeading">API key</h2>
+      <label class="checkbox"><input id="noKeyRequired" type="checkbox">This endpoint needs no API key</label>
+      <label for="apiKey">Save or replace key</label>
+      <input id="apiKey" type="password" autocomplete="new-password">
+      <p id="keyStatus" class="hint"></p>
+    </section>
     <button id="saveSettings" type="button">Save AI settings</button>
     <details class="advanced"><summary>How requests work</summary>
       <p class="notice">Selecting subtitle text sends the phrase, nearby cues, optional secondary text, and chat to this endpoint. The provider may charge for requests. The packaged helper makes network requests outside IINA's HTTP domain permission.</p>

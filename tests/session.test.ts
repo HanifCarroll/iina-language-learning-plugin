@@ -110,6 +110,13 @@ test('late install initializes an already loaded player only once', () => {
   player.close();
 });
 
+test('header close hides the sidebar even without a conversation', () => {
+  const player = fakePlayer();
+  player.sidebar.get('close')!({});
+  expect(player.actions.at(-1)).toBe('sidebar hide');
+  player.close();
+});
+
 test('Plugin menu loads an SRT and selects source and secondary tracks in this window', async () => {
   const player = fakePlayer();
   expect(player.menuItems.map(item => item.title)).toEqual([
