@@ -1,8 +1,8 @@
 # Neden: implementation plan and evidence
 
-**Status:** the approved product modules are implemented locally. The installed-IINA milestone remains historical evidence; current product results and outstanding checks are in [ACCEPTANCE_REPORT.md](ACCEPTANCE_REPORT.md). A local Git repository exists; `.references/` and `dist/` are ignored. `docs/SPEC.md` is the behavior source of truth.
+**Archived plan:** The disposable integration plugin source has been removed. Current behavior is in [SPEC.md](../SPEC.md); product results and outstanding checks are in [ACCEPTANCE_REPORT.md](../../ACCEPTANCE_REPORT.md). This document preserves the approved design and Phase 0 research.
 
-**0.1.7 product update:** At the owner's request, a completed selection now auto-explains, so the earlier selection-only and separate Explain descriptions below are historical. The action row was removed to keep subtitles stationary. Hide / Resume and ⌥⌘G retain the chat until the next completed selection; reopened follow-ups pause playback again. Optional stacked secondary display starts off and places IINA's selected secondary text above the source, with size/color controls, source bottom position, and an upper-line gap. This mode temporarily owns native secondary visibility. The existing `markdown-it` renderer formats model answers locally. Installed IINA evidence and open native checks are in [ACCEPTANCE_REPORT.md](ACCEPTANCE_REPORT.md); the module design and prior feasibility findings below remain useful background.
+**0.1.7 product update:** At the owner's request, a completed selection now auto-explains, so the earlier selection-only and separate Explain descriptions below are historical. The action row was removed to keep subtitles stationary. Hide / Resume and ⌥⌘G retain the chat until the next completed selection; reopened follow-ups pause playback again. Optional stacked secondary display starts off and places IINA's selected secondary text above the source, with size/color controls, source bottom position, and an upper-line gap. This mode temporarily owns native secondary visibility. The existing `markdown-it` renderer formats model answers locally. Installed IINA evidence and open native checks are in [ACCEPTANCE_REPORT.md](../../ACCEPTANCE_REPORT.md); the module design and prior feasibility findings below remain useful background.
 
 ## Target and development setup
 
@@ -87,7 +87,7 @@ The privileged side constructs `POST <canonical-base-path>/chat/completions` wit
 
 ## Acceptance tests and evidence needed
 
-This table preserves the **approval-time** acceptance proposal. The result for each A01–A24 scenario is tracked in [ACCEPTANCE_REPORT.md](ACCEPTANCE_REPORT.md). Synthetic fixtures include `Ben öyle bir insan mıyım?`, repeated text at different times, overlapping cues, line breaks, and source/translation segmentation that does not match.
+This table preserves the **approval-time** acceptance proposal. The result for each A01–A24 scenario is tracked in [ACCEPTANCE_REPORT.md](../../ACCEPTANCE_REPORT.md). Synthetic fixtures include `Ben öyle bir insan mıyım?`, repeated text at different times, overlapping cues, line breaks, and source/translation segmentation that does not match.
 
 | Spec IDs | Expected final state, effects, and recovery | Test/evidence |
 |---|---|---|
@@ -104,7 +104,7 @@ This table preserves the **approval-time** acceptance proposal. The result for e
 
 ## Historical approved implementation sequence
 
-The steps below were the approved order of work. They are complete at the code level; [ACCEPTANCE_REPORT.md](ACCEPTANCE_REPORT.md) distinguishes checks that passed in installed IINA from checks still outstanding.
+The steps below were the approved order of work. They are complete at the code level; [ACCEPTANCE_REPORT.md](../../ACCEPTANCE_REPORT.md) distinguishes checks that passed in installed IINA from checks still outstanding.
 
 1. **Completed evidence:** packaged Swift helper, local mock transport, synthetic overlay/sidebar, and defining native UI checks. Keep the raw-disable timeout/manual-recovery limitation explicit.
 2. Reconcile this plan and spec with the installed milestone, then add the product overlay/sidebar and host adapter. Carry over the tested selection, cue freeze, hit area, native dismissal, fullscreen, two-window, and restoration behaviors; distinguish natural advancement from seek and complete app-focus/concurrent-window checks.
@@ -118,4 +118,4 @@ Plugin identifier: `io.github.hanifcarroll.iina-language-learning` (stable and d
 
 Approved IINA permissions are `video-overlay` for selection and `file-system` for the per-request native helper and private FIFO. Reading `@sub/<id>` and setting `sub-visibility` are supported without a broader filesystem permission, but executing the helper requires it. Do not request `show-osd` or `show-alert`. The helper's direct network access is outside IINA `http` domain enforcement, so settings and installation documentation must say this plainly. `allowedDomains` is empty; no wildcard is needed because `iina.http` is not the provider transport. The owner approved this wider native-helper trust boundary for the MVP.
 
-**Current state:** The approved product implementation is committed locally. No IINA fork, custom build, or upstream API change is an MVP prerequisite. Native dismissal worked on tested Back, outside-click, tab-switch, and fullscreen paths, so an explicit-Close/Resume-only fallback is not proposed. The current product evidence and remaining checks are in [ACCEPTANCE_REPORT.md](ACCEPTANCE_REPORT.md). Raw Preferences disable can leave the helper running to its total timeout, native primary subtitles hidden, and playback paused, and cannot guarantee prevention of provider billing. Release and distribution remain outside this local implementation work.
+**Current state at archiving:** The approved product implementation was committed locally. No IINA fork, custom build, or upstream API change is an MVP prerequisite. Native dismissal worked on tested Back, outside-click, tab-switch, and fullscreen paths, so an explicit-Close/Resume-only fallback is not proposed. The current product evidence and remaining checks are in [ACCEPTANCE_REPORT.md](../../ACCEPTANCE_REPORT.md). Raw Preferences disable can leave the helper running to its total timeout, native primary subtitles hidden, and playback paused, and cannot guarantee prevention of provider billing. Release and distribution remain outside this local implementation work.

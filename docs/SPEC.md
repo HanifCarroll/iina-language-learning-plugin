@@ -1,7 +1,7 @@
 # Neden — MVP Specification
 
 **Version:** 0.1 · **Date:** September 23, 2026  
-**Status:** Behavior source of truth. The owner approved the architecture and remaining implementation after the installed-IINA integration milestone. Historical Phase 0 evidence remains in [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) and [INTEGRATION_MILESTONE.md](../INTEGRATION_MILESTONE.md). Current product test results and outstanding checks are in [ACCEPTANCE_REPORT.md](../ACCEPTANCE_REPORT.md).
+**Status:** Behavior source of truth. The owner approved the architecture and remaining implementation after the installed-IINA integration milestone. Historical Phase 0 evidence remains in [IMPLEMENTATION_PLAN.md](history/IMPLEMENTATION_PLAN.md) and [INTEGRATION_MILESTONE.md](history/INTEGRATION_MILESTONE.md). Current product test results and outstanding checks are in [ACCEPTANCE_REPORT.md](../ACCEPTANCE_REPORT.md).
 **Project name:** Neden. The established local plugin identifier remains `io.github.hanifcarroll.iina-language-learning` to preserve installed settings and Keychain identity.
 
 ## 1. Product intent
@@ -49,7 +49,7 @@ These settle edge cases for the MVP; they are not additional features requested 
 - Hiding the panel retains its most recent conversation in memory for reopening in that player window, including incomplete output from a cancelled stream. A new completed selection, media change, window close, provider/language/context change, or Disable Overlay clears it. There is no history list.
 - Sending a follow-up or retry after reopening a retained conversation pauses the same playable media again; hiding the panel resumes it under the same ownership rules.
 - The built-in learner brief assumes a beginner in the configured source language, with grammatical terminology briefly explained. Do not embed the owner's personal biography or presume every user knows Spanish.
-- The approved TypeScript/DOM architecture and packaged Swift helper are recorded in `IMPLEMENTATION_PLAN.md`. The local plugin identifier and MIT source license are recorded there; any release decision remains separate.
+- The approved TypeScript/DOM architecture and packaged Swift helper are recorded in `docs/history/IMPLEMENTATION_PLAN.md`. The local plugin identifier and MIT source license are recorded there; any release decision remains separate.
 
 ## 3. Scope boundaries
 
@@ -65,7 +65,7 @@ Do not add roadmap features because a reference project or the mockup contains t
 
 ## 4. Visual direction and UI
 
-The approved concept is bundled as [`docs/ui-reference.png`](docs/ui-reference.png). It is **visual guidance, not a feature inventory or an exact rendering guarantee**.
+The approved concept is bundled as [`ui-reference.png`](ui-reference.png). It is **visual guidance, not a feature inventory or an exact rendering guarantee**.
 
 Preserve its overall composition: unobtrusive selectable subtitles over the existing video and a dark, readable right-hand explanation/chat sidebar. Use normal macOS/IINA interaction conventions and usable contrast. Do not reproduce the image's Transcript, Vocabulary, Add to vocabulary, or extra action controls.
 
@@ -253,7 +253,7 @@ Keep one small repository and one plugin build. Do not create a multi-package fr
 | Credential adapter | Keychain only; no keys in presentation state or conversation objects. |
 | UI | Selection/action, sidebar, settings, safe rendering; validated messages to privileged code. |
 
-The owner approved these responsibility boundaries and the concrete modules/interfaces in `IMPLEMENTATION_PLAN.md`. Keep the product implementation small and independently testable.
+The owner approved these responsibility boundaries and the concrete modules/interfaces in `docs/history/IMPLEMENTATION_PLAN.md`. Keep the product implementation small and independently testable.
 
 Keep locally useful IDs separate from provider payloads. At minimum, async operations must be associated with a window/media generation, conversation ID, and request ID or equivalent ownership tokens so out-of-order callbacks cannot corrupt current state.
 
@@ -261,7 +261,7 @@ Save and restore only host state the plugin changes. Primary hiding is an owned 
 
 ## 10. Phase 0 and installed-IINA evidence
 
-The Phase 0 spike and subsequent packaged-helper/UI milestone ran against the actual target Mac and installed IINA. `IMPLEMENTATION_PLAN.md` preserves the original Phase 0 observations, including checks that were open at that time. `INTEGRATION_MILESTONE.md` records the later installed-package results. Neither harness proves the complete product. No compatibility minimum beyond the tested setup is asserted.
+The Phase 0 spike and subsequent packaged-helper/UI milestone ran against the actual target Mac and installed IINA. `docs/history/IMPLEMENTATION_PLAN.md` preserves the original Phase 0 observations, including checks that were open at that time. `docs/history/INTEGRATION_MILESTONE.md` records the later installed-package results. The disposable integration plugin source has since been removed. Neither harness proves the complete product. No compatibility minimum beyond the tested setup is asserted.
 
 | Check | Required evidence / decision |
 |---|---|

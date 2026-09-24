@@ -1,6 +1,6 @@
 # Product acceptance evidence
 
-**Status (2026-09-24):** the approved MVP and version 0.1.8 subtitle-menu changes have been tested locally. The **Neden** 0.1.9 candidate now includes appearance preview and one-shot cue replay. This is not a release or a claim that all A01–A26 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
+**Status (2026-09-24):** the approved MVP and version 0.1.8 subtitle-menu changes have been tested locally. The **Neden** 0.1.9 candidate now includes appearance preview and one-shot cue replay. This is not a release or a claim that all A01–A26 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](docs/history/INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
 
 ## Appearance preview and cue replay (version 0.1.9)
 

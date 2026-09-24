@@ -1,12 +1,14 @@
-# Installed-IINA integration milestone
+# Installed-IINA integration milestone (historical)
+
+The disposable `integration/` plugin and its build script have been removed. This report records tests run at the time; the [current spec](../SPEC.md) and [acceptance report](../../ACCEPTANCE_REPORT.md) supersede it for product behavior and verification status.
 
 **Date and target:** 2026-09-23; macOS 27.0 arm64; installed IINA 1.5.0-beta2 build 172 with bundled mpv 0.41.0. This is a synthetic integration harness, not the finished language-learning plugin. It uses a generated grey video, two short synthetic SRT files, a local mock server, and a generated disposable Keychain value. No real provider, credentials, commercial subtitle fixture, or billable request was used.
 
 ## What was built
 
 - `native/stream-helper.swift` is the packaged Swift URLSession SSE executable. It receives a private directory path, creates mode-0600 request/control FIFOs there, accepts bounded JSON through the request FIFO, and sends bounded base64-encoded delta records on stdout. It applies endpoint, redirect, response-size, and timeout checks and removes its FIFO directory on normal termination.
-- `integration/` is a disposable per-window IINA plugin that exercises a selectable DOM overlay, native secondary subtitles, sidebar visibility, Keychain read/write, and the helper. It only auto-loads the synthetic tracks for a video path ending in `/clip.mp4`. The sidebar exposes local mock modes and an in-plugin Disable Overlay control.
-- `scripts/build-integration.sh` builds the folder under ignored `dist/`. IINA's bundled `iina-plugin pack dist/org.hanif.phase0.integration.iinaplugin` produced `org.hanif.phase0.integration.iinaplugin-0.1.0.iinaplgz`; `unzip -t` passed. The archive was installed into an isolated application-support profile and run by the installed IINA. The normal plugin directory was not changed.
+- `integration/` was a disposable per-window IINA plugin that exercised a selectable DOM overlay, native secondary subtitles, sidebar visibility, Keychain read/write, and the helper. It only auto-loaded the synthetic tracks for a video path ending in `/clip.mp4`. The sidebar exposed local mock modes and an in-plugin Disable Overlay control.
+- `scripts/build-integration.sh` built the folder under ignored `dist/`. IINA's bundled `iina-plugin pack dist/org.hanif.phase0.integration.iinaplugin` produced `org.hanif.phase0.integration.iinaplugin-0.1.0.iinaplgz`; `unzip -t` passed. The archive was installed into an isolated application-support profile and run by the installed IINA. The normal plugin directory was not changed.
 - `tests/test_stream_helper.py`, `tests/mock_server.py`, and `tests/fixtures/` provide the local checks. No reference implementation was copied. The `.references/` clones remain ignored and read-only.
 
 ## Transport tests actually run
