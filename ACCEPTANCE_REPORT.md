@@ -2,6 +2,14 @@
 
 **Status (2026-09-23):** the approved MVP is implemented and committed locally. This is a local implementation report, not a release or a claim that all A01–A24 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
 
+## UI dogfood update (version 0.1.2)
+
+The owner's live IINA screenshot and a read-only inspection of that open sidebar showed three problems: the phrase and nearly identical full cue took two lines of prominent space, provider Markdown appeared as raw `**` text, and a long answer pushed the follow-up composer below the visible area. Version 0.1.2 formats model Markdown locally with HTML, links, and image loading disabled; keeps the full cue behind **Full subtitle line**; pins the phrase and composer around a scrollable answer; and preserves completed answer DOM nodes across status updates. No new provider request was made for this review.
+
+The revised sidebar was visually checked in a 470 px browser preview with synthetic completed, empty-streaming, long-answer, and settings states. The long-answer check found an initial auto-scroll to the bottom; that was fixed and the top and scrolled states were rechecked. The browser preview is layout evidence, not an installed-IINA pass. The normal IINA installation and its existing movie/credentials were left untouched. Version 0.1.2 still needs an installed-IINA UI check after the owner chooses to update it. The version 0.1.0 native evidence and the original 26-test result below remain historical.
+
+For 0.1.2, `bun test` passed 28 tests with 129 assertions, `bun run build` passed TypeScript typechecking and bundling, and IINA's packer created an archive that passed `unzip -t`. The archive contains the Swift helper and bundled Markdown dependency notices. A preview file was briefly present in the build folder during visual testing; the build now clears that folder before packaging, and the final archive was checked to exclude it.
+
 ## Environment and levels of evidence
 
 - **Installed product:** version 0.1.0 was installed through IINA's **Install Local Package** control in a fresh isolated profile at `/tmp/iina-final-install-isolated`. IINA 1.5.0-beta2 build 172 restarted and loaded that installed copy on macOS 27 arm64 with bundled mpv 0.41.0. The permission dialog showed the documented `file-system` and `video-overlay` permissions. At that point the normal IINA profile was not modified. The later 0.1.1 late-install fix has automated coverage but has not yet had an installed-IINA retest.

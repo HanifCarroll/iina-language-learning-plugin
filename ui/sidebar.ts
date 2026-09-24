@@ -1,36 +1,76 @@
+import MarkdownIt from 'markdown-it/browser';
+
 type Bridge = { onMessage(name: string, callback: (data: string) => void): void; postMessage(name: string, data: unknown): void };
 declare const iina: Bridge;
 type ViewState = {
-  status: string; open: boolean; overlayEnabled: boolean; phrase: string; cue: string;
+  status: string; open: boolean; conversationId: number | null; overlayEnabled: boolean; phrase: string; cue: string;
   turns: Array<{ question: string; answer: string; status: string; error?: string }>;
   settings: { endpoint: string; model: string; sourceLanguage: string; explanationLanguage: string;
     includeSecondary: boolean; noKeyRequired: boolean; hasSavedKey: boolean; requestUrl: string };
 };
+
+const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
+// Provider text may format explanations, but it cannot create links or load images.
+markdown.renderer.rules.link_open = () => '';
+markdown.renderer.rules.link_close = () => '';
+markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 
 export function mountSidebar(doc: Document, bridge: Bridge): void {
   const element = <T extends HTMLElement>(id: string): T => doc.getElementById(id) as T;
   const question = element<HTMLTextAreaElement>('question');
   let state: ViewState | null = null;
   let settingsOpen = false;
+  let renderedConversationId: number | null = null;
+  let renderedAnswers: string[] = [];
 
   function render(): void {
     if (!state) return;
-    element('status').textContent = state.status;
+    const busy = state.turns.at(-1)?.status === 'streaming';
+    const status = element('status');
+    status.textContent = state.status;
+    status.hidden = state.open && ['Complete', 'Generating…', 'Preparing explanation…'].includes(state.status);
     element('disableOverlay').textContent = state.overlayEnabled ? 'Disable Overlay' : 'Enable Overlay';
+    element('settingsToggle').hidden = settingsOpen;
     element('conversation').hidden = !state.open || settingsOpen;
     element('settings').hidden = !settingsOpen;
-    element('phrase').textContent = state.phrase;
-    element('sourceCue').textContent = state.cue;
-    const turns = element('turns');
-    turns.replaceChildren();
-    for (const turn of state.turns) {
-      const card = doc.createElement('div'); card.className = 'turn';
-      const title = doc.createElement('h3'); title.textContent = turn.question || 'Explanation';
-      const answer = doc.createElement('p'); answer.textContent = turn.answer;
-      const status = doc.createElement('small'); status.textContent = turn.error ? `${turn.status}: ${turn.error}` : turn.status;
-      card.append(title, answer, status); turns.append(card);
+    if (renderedConversationId !== state.conversationId) {
+      renderedConversationId = state.conversationId;
+      renderedAnswers = [];
+      element('turns').replaceChildren();
+      question.value = '';
+      element<HTMLDetailsElement>('fullCue').open = false;
     }
-    const busy = state.turns.at(-1)?.status === 'streaming';
+    if (element('phrase').textContent !== state.phrase) element('phrase').textContent = state.phrase;
+    if (element('sourceCue').textContent !== state.cue) element('sourceCue').textContent = state.cue;
+    element('fullCue').hidden = state.phrase.trim() === state.cue.trim();
+    const turns = element('turns');
+    const stickToBottom = turns.childElementCount > 0 && turns.scrollHeight - turns.scrollTop - turns.clientHeight < 48;
+    state.turns.forEach((turn, index) => {
+      let card = turns.children[index] as HTMLElement | undefined;
+      if (!card) {
+        card = doc.createElement('article'); card.className = 'turn';
+        if (turn.question) {
+          const title = doc.createElement('h3'); title.textContent = turn.question;
+          card.append(title);
+        }
+        const answer = doc.createElement('div'); answer.className = 'answer';
+        const turnStatus = doc.createElement('small'); turnStatus.className = 'turn-status';
+        card.append(answer, turnStatus); turns.append(card);
+      }
+      const answer = card.querySelector<HTMLElement>('.answer')!;
+      if (renderedAnswers[index] !== turn.answer) {
+        answer.innerHTML = turn.answer ? markdown.render(turn.answer) : '<p class="placeholder">Waiting for response…</p>';
+        renderedAnswers[index] = turn.answer;
+      }
+      const turnStatus = card.querySelector<HTMLElement>('.turn-status')!;
+      turnStatus.textContent = turn.error ? `${turn.status}: ${turn.error}` : turn.status === 'streaming' ? 'Generating…' : turn.status === 'complete' ? '' : turn.status;
+      turnStatus.hidden = turn.status === 'complete';
+    });
+    while (turns.children.length > state.turns.length) {
+      turns.lastElementChild?.remove();
+      renderedAnswers.pop();
+    }
+    if (stickToBottom) turns.scrollTop = turns.scrollHeight;
     element<HTMLButtonElement>('send').disabled = !!busy;
     element('stop').hidden = !busy;
     element('retry').hidden = !['failed', 'incomplete'].includes(state.turns.at(-1)?.status ?? '');

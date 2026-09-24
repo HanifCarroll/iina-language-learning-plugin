@@ -18,7 +18,7 @@ python3 tests/test_stream_helper.py dist/io.github.hanifcarroll.iina-language-le
 /Applications/IINA.app/Contents/MacOS/iina-plugin pack dist/io.github.hanifcarroll.iina-language-learning.iinaplugin
 ```
 
-The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored `.iinaplugin` folder under `dist/`. IINA's bundled packer writes an ignored `.iinaplgz` archive in the current directory. Install the archive through IINA's plugin settings. Version 0.1.1 initializes in an already loaded player window; if an older installation shows an empty Language Learning sidebar after installation, quit IINA fully and reopen the movie. The project does not modify IINA itself.
+The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored `.iinaplugin` folder under `dist/`. IINA's bundled packer writes an ignored `.iinaplgz` archive in the current directory. Install the archive through IINA's plugin settings. Version 0.1.2 initializes in an already loaded player window; if an older installation shows an empty Language Learning sidebar after installation, quit IINA fully and reopen the movie. The project does not modify IINA itself.
 
 ## Use
 
@@ -26,7 +26,7 @@ The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored 
 2. Open the Language Learning sidebar and enter an HTTPS API base URL and model. The plugin appends `/chat/completions`. HTTP is accepted only for `localhost`, `127.0.0.1`, or `::1` test endpoints. Enter an API key unless the endpoint needs none. Save settings before selecting text. A newly entered key goes directly to the plugin's verified IINA Keychain API; saved keys are never shown in the sidebar.
 3. Select a word or phrase in the source subtitle. Selection alone does not pause or send a request. Click **Explain with AI** to pause playback and open the conversation. Send follow-ups from the same sidebar. **Stop** marks partial output incomplete; **Retry** manually starts a new request for that turn. **Close/Resume** closes the conversation and resumes eligible playback of the same media.
 
-Changing provider, language, or secondary-context settings ends an open conversation; make a fresh selection to use the new settings. The secondary subtitle remains visible even when its text is omitted from AI context. The sidebar uses plain text for model output and subtitle content.
+Changing provider, language, or secondary-context settings ends an open conversation; make a fresh selection to use the new settings. The secondary subtitle remains visible even when its text is omitted from AI context. The sidebar formats model Markdown locally with HTML, links, and image loading disabled. The complete source cue is available through **Full subtitle line**; subtitle content remains plain text.
 
 **Disable Overlay** in plugin Settings is the supported safe shutdown control. It cancels active work, closes the conversation under the same-media resume rule, and restores the native primary subtitle state owned by that window. Raw disable in IINA Preferences does not call plugin cleanup in IINA 1.5.0-beta2. In that case a helper can run until its 120-second total timeout, native primary subtitles can remain hidden, and playback can remain paused. Recover with **Subtitles → Show Subtitles** and, if needed, **Playback → Resume**. A request may still be billable after raw disable.
 
@@ -40,6 +40,6 @@ See [the spec](docs/SPEC.md), [implementation plan](IMPLEMENTATION_PLAN.md), and
 
 ## Dependencies and provenance
 
-- Runtime: IINA's public plugin APIs (IINA is GPL-3.0) and macOS Foundation/URLSession; no IINA source is copied.
+- Runtime: IINA's public plugin APIs (IINA is GPL-3.0), macOS Foundation/URLSession, and markdown-it 15.0.2 (MIT) for local Markdown rendering. markdown-it's bundled dependencies and their license notices are included in the plugin's `licenses/` directory. No IINA source is copied.
 - Development: TypeScript 5.9.3 (Apache-2.0), happy-dom 20.8.3 (MIT), and `@types/bun` 1.3.14 (MIT), plus their pinned lockfile dependencies. Bun runs tests and bundles JavaScript. These tools are not bundled into the plugin archive.
 - Phase 0 references are in ignored `.references/` and were used for research only. No substantial source was copied. The plugin's own source is MIT licensed.

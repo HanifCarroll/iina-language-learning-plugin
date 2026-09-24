@@ -386,7 +386,8 @@ export class Session {
     } catch { /* an unsaved invalid endpoint has no credential status */ }
     const conversation = this.conversation;
     this.host.toSidebar('state', {
-      status: this.status, open: !!conversation, overlayEnabled: this.overlayEnabled,
+      status: this.status, open: !!conversation, conversationId: conversation?.id ?? null,
+      overlayEnabled: this.overlayEnabled,
       phrase: conversation?.context.selection.exactText ?? '',
       cue: conversation?.context.selection.cueText ?? '',
       turns: conversation?.turns ?? [],
