@@ -48,7 +48,8 @@ function fakePlayer(alreadyLoaded = false) {
       postMessage: (name: string, encoded: string) => {
         overlayMessages.push(name);
         overlayPayloads.push({ name, value: JSON.parse(decodeURIComponent(encoded)) });
-      }, show: () => actions.push('overlay show'), hide: () => actions.push('overlay hide'), setClickable: () => {} },
+      }, show: () => actions.push('overlay show'), hide: () => actions.push('overlay hide'),
+      setClickable: (value: boolean) => actions.push(`overlay clickable ${value}`) },
     sidebar: { loadFile: () => { sidebar.clear(); }, onMessage: (name: string, callback: (value: unknown) => void) => { sidebar.set(name, callback); },
       postMessage: (name: string, encoded: string) => {
         if (name === 'state') states.push(JSON.parse(decodeURIComponent(encoded)));
@@ -81,6 +82,24 @@ function fakePlayer(alreadyLoaded = false) {
     setChosenFile: (path: string) => { chosenFile = path; },
     shortcut: () => panelShortcut?.(), tick: () => (session as any).tick(), close: () => events.get('iina.window-will-close')?.() };
 }
+
+test('overlay accepts clicks only while a readable source track is active', () => {
+  const player = fakePlayer();
+  expect(player.actions).toContain('overlay clickable true');
+
+  player.raw.core.subtitle.id = 0;
+  player.tick();
+  expect(player.actions.at(-1)).toBe('overlay clickable false');
+
+  player.raw.core.subtitle.id = 1;
+  player.tick();
+  expect(player.actions.at(-1)).toBe('overlay clickable true');
+
+  player.props.set('sub-text', 'Different subtitle');
+  player.tick();
+  expect(player.actions.at(-1)).toBe('overlay clickable false');
+  player.close();
+});
 
 test('late install initializes an already loaded player only once', () => {
   const player = fakePlayer(true);

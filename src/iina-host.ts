@@ -29,6 +29,7 @@ export type RawIina = {
 export class IinaHost {
   private ownedPrimary: boolean | null = null;
   private ownedSecondary: boolean | null = null;
+  private overlayClickable: boolean | null = null;
   constructor(readonly raw: RawIina, private readonly pluginId: string) {}
 
   get mediaUrl(): string { return this.raw.core.status.url || ''; }
@@ -96,8 +97,13 @@ export class IinaHost {
   pause(): void { this.raw.core.pause(); }
   resume(): void { this.raw.core.resume(); }
   seekTo(positionMs: number): void { this.raw.core.seekTo(positionMs / 1000); }
-  showOverlay(): void { this.raw.overlay.setClickable(true); this.raw.overlay.show(); }
-  hideOverlay(): void { this.raw.overlay.hide(); }
+  showOverlay(): void { this.setOverlayClickable(false); this.raw.overlay.show(); }
+  setOverlayClickable(clickable: boolean): void {
+    if (this.overlayClickable === clickable) return;
+    this.raw.overlay.setClickable(clickable);
+    this.overlayClickable = clickable;
+  }
+  hideOverlay(): void { this.setOverlayClickable(false); this.raw.overlay.hide(); }
   showSidebar(): void { this.raw.sidebar.show(); }
   hideSidebar(): void { this.raw.sidebar.hide(); }
 

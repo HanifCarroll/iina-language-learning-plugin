@@ -93,8 +93,10 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     element('aiView').hidden = view !== 'ai';
     element('conversation').hidden = !state.open;
     renderTrackChoices();
-    const sourceTrack = state.subtitleTracks?.find(track => track.id === state.sourceId);
-    const secondaryTrack = state.subtitleTracks?.find(track => track.id === state.secondaryId);
+    const sourceId = state.sourceId;
+    const secondaryId = state.secondaryId;
+    const sourceTrack = state.subtitleTracks?.find(track => track.id === sourceId);
+    const secondaryTrack = state.subtitleTracks?.find(track => track.id === secondaryId);
     const top = state.settings.secondaryBelowSource ? sourceTrack : secondaryTrack;
     const bottom = state.settings.secondaryBelowSource ? secondaryTrack : sourceTrack;
     element('subtitleOrder').textContent = `Top: ${top?.title ?? '—'} · Bottom: ${bottom?.title ?? '—'}`;

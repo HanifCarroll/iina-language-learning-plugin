@@ -293,6 +293,7 @@ export class Session {
     this.secondary = [];
     this.cueIdentity = '';
     this.translationText = '';
+    this.host.setOverlayClickable(false);
     if (this.overlayReady) this.host.toOverlay('clear', {});
     if (this.overlayReady) this.host.toOverlay('translation', '');
     this.host.hideSidebar();
@@ -361,6 +362,7 @@ export class Session {
     const showSecondary = sourceReady && this.secondaryId !== null && this.secondaryId !== 0;
     if (showSecondary) this.host.ownSecondary();
     else this.host.restoreSecondary();
+    this.host.setOverlayClickable(sourceReady);
     const translation = showSecondary ? this.host.secondaryText : '';
     if (force || translation !== this.translationText) {
       this.translationText = translation;
