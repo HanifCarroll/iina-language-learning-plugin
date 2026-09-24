@@ -47,7 +47,7 @@ button:disabled{opacity:.5;cursor:default}
 .row{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
 label{display:block;margin:12px 0 4px}
 input:not([type=checkbox]),textarea{display:block;width:100%;padding:8px 10px;background:#232c36;border:1px solid #607183;border-radius:6px;color:#fff}
-textarea{line-height:20px;resize:none;overflow-y:auto;min-height:38px;max-height:78px}
+textarea{line-height:20px;resize:none;overflow-y:auto;min-height:38px;max-height:68px}
 textarea::placeholder{color:#a1aebb}
 .checkbox{display:flex;gap:8px;align-items:center}
 .notice{font-size:12px;color:#c7d0da}

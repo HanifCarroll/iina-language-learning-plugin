@@ -27,7 +27,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     const turns = element('turns');
     const atBottom = turns.scrollHeight - turns.scrollTop - turns.clientHeight < 48;
     question.style.height = 'auto';
-    question.style.height = `${Math.max(38, Math.min(question.scrollHeight, 78))}px`;
+    question.style.height = `${Math.max(38, Math.min(question.scrollHeight, 68))}px`;
     if (atBottom) turns.scrollTop = turns.scrollHeight;
   }
 

@@ -18,7 +18,7 @@ python3 tests/test_stream_helper.py dist/io.github.hanifcarroll.iina-language-le
 /Applications/IINA.app/Contents/MacOS/iina-plugin pack dist/io.github.hanifcarroll.iina-language-learning.iinaplugin
 ```
 
-The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored `.iinaplugin` folder under `dist/`. IINA's bundled packer writes an ignored `.iinaplgz` archive in the current directory. Install the archive through IINA's plugin settings. Version 0.1.3 initializes in an already loaded player window; if an older installation shows an empty Language Learning sidebar after installation, quit IINA fully and reopen the movie. The project does not modify IINA itself.
+The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored `.iinaplugin` folder under `dist/`. IINA's bundled packer writes an ignored `.iinaplgz` archive in the current directory. Install the archive through IINA's plugin settings. Version 0.1.4 initializes in an already loaded player window; if the Language Learning sidebar is temporarily empty after reinstalling, reopen it or restart IINA. The project does not modify IINA itself.
 
 ## Use
 
@@ -36,7 +36,7 @@ The plugin uses a packaged, per-request Swift executable with `URLSession` for r
 
 Limits: 8 MiB and 50,000 cues per subtitle file; 4,000 characters per cue/selection; 2,000 characters per follow-up; 20 turns; 128 KiB request JSON; 64 KiB answer and SSE event. Exceeding a limit fails visibly. The plugin does not silently drop required neighboring cues or completed turns. No automatic retry or provider switch occurs.
 
-See [the spec](docs/SPEC.md), [implementation plan](IMPLEMENTATION_PLAN.md), [evaluation plan](docs/EVAL_PLAN.md), and [acceptance report](ACCEPTANCE_REPORT.md) for behavior and current verification. Synthetic fixtures and controlled local endpoints are used in tests. No provider key or complete commercial subtitle track is committed. The evaluation cases are proposals; no live model evaluation has run.
+See [the spec](docs/SPEC.md), [implementation plan](IMPLEMENTATION_PLAN.md), [evaluation plan](docs/EVAL_PLAN.md), and [acceptance report](ACCEPTANCE_REPORT.md) for behavior and current verification. `bun test tests/evals.test.ts` checks 12 synthetic request cases and the scoring rules; `bun run evals --template` creates an ignored review worksheet, and `bun run evals .tmp/eval-review.json` gives per-case verdicts after responses are reviewed. No provider key or complete commercial subtitle track is committed. No live model evaluation has run.
 
 ## Dependencies and provenance
 

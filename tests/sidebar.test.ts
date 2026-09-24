@@ -113,7 +113,7 @@ test('chat composer grows to three lines and message scrolling follows new repli
   expect(turns.scrollTop).toBe(0); // opening an existing long answer starts at its beginning
   question.value = 'one\ntwo\nthree\nfour';
   question.dispatchEvent(new window.Event('input') as unknown as Event);
-  expect(question.style.height).toBe('78px');
+  expect(question.style.height).toBe('68px');
   question.value = 'one';
   question.dispatchEvent(new window.Event('input') as unknown as Event);
   expect(question.style.height).toBe('38px');

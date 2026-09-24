@@ -15,8 +15,12 @@ class Mock(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
         try:
-            valid = json.loads(body).get("stream") is True
+            request = json.loads(body)
+            if not isinstance(request, dict):
+                request = {}
+            valid = request.get("stream") is True
         except (ValueError, UnicodeDecodeError):
+            request = {}
             valid = False
         authorized = self.headers.get("Authorization", "").startswith("Bearer fixture-")
         print(json.dumps({"path": self.path, "authorized": authorized, "stream": valid}), flush=True)
@@ -39,6 +43,12 @@ class Mock(http.server.BaseHTTPRequestHandler):
         if self.path == "/slow-first":
             return
         parts = ["Ön", "ce", " —", " gerçek", " akış"]
+        if self.path == "/chat/completions":
+            parts = (["**Follow-up**\n", "This is a synthetic reply ", "to test the chat layout."]
+                     if len(request.get("messages", [])) > 2 else
+                     ["**Natural meaning**\n", "A synthetic explanation for the selected phrase.\n\n",
+                      "**Literal meaning**\n", "A synthetic word-by-word gloss.\n\n",
+                      "**Breakdown**\n", "This text tests Markdown rendering and streaming."])
         if self.path == "/long":
             parts = [f"chunk {i} " for i in range(100)]
         for index, part in enumerate(parts):
