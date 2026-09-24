@@ -2,6 +2,8 @@
 
 **Status:** the approved product modules are implemented locally. The installed-IINA milestone remains historical evidence; current product results and outstanding checks are in [ACCEPTANCE_REPORT.md](ACCEPTANCE_REPORT.md). A local Git repository exists; `.references/` and `dist/` are ignored. `docs/SPEC.md` is the behavior source of truth.
 
+**0.1.7 product update:** At the owner's request, a completed selection now auto-explains, so the earlier selection-only and separate Explain descriptions below are historical. The action row was removed to keep subtitles stationary. Hide / Resume and ⌥⌘G retain the chat until the next completed selection; reopened follow-ups pause playback again. Optional stacked secondary display starts off and places IINA's selected secondary text above the source, with size/color controls, source bottom position, and an upper-line gap. This mode temporarily owns native secondary visibility. The existing `markdown-it` renderer formats model answers locally. Installed IINA evidence and open native checks are in [ACCEPTANCE_REPORT.md](ACCEPTANCE_REPORT.md); the module design and prior feasibility findings below remain useful background.
+
 ## Target and development setup
 
 | Item | Observed target |

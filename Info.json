@@ -1,7 +1,7 @@
 {
   "name": "IINA Language Learning",
   "identifier": "io.github.hanifcarroll.iina-language-learning",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "author": { "name": "Hanif Carroll" },
   "entry": "main.js",
   "sidebarTab": { "name": "Language Learning" },
@@ -14,7 +14,16 @@
       "sourceLanguage": "Turkish",
       "explanationLanguage": "English",
       "includeSecondary": true,
-      "noKeyRequired": false
+      "noKeyRequired": false,
+      "appearance": {
+        "showTranslation": false,
+        "sourceSize": 28,
+        "sourceColor": "#ffffff",
+        "sourceBottom": 8,
+        "translationSize": 25,
+        "translationColor": "#ffffff",
+        "translationGap": 12
+      }
     }
   }
 }

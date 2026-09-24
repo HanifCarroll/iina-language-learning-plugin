@@ -10,12 +10,36 @@ const PLUGIN_ID = 'io.github.hanifcarroll.iina-language-learning';
 
 type Settings = {
   endpoint: string; model: string; sourceLanguage: string; explanationLanguage: string;
-  includeSecondary: boolean; noKeyRequired: boolean;
+  includeSecondary: boolean; noKeyRequired: boolean; appearance: Appearance;
 };
+type Appearance = { showTranslation: boolean; sourceSize: number; sourceColor: string; sourceBottom: number;
+  translationSize: number; translationColor: string; translationGap: number };
+const DEFAULT_APPEARANCE: Appearance = { showTranslation: false, sourceSize: 28, sourceColor: '#ffffff',
+  sourceBottom: 8, translationSize: 25, translationColor: '#ffffff', translationGap: 12 };
 const DEFAULTS: Settings = {
   endpoint: '', model: '', sourceLanguage: 'Turkish', explanationLanguage: 'English',
-  includeSecondary: true, noKeyRequired: false
+  includeSecondary: true, noKeyRequired: false, appearance: DEFAULT_APPEARANCE
 };
+
+function validAppearance(value: unknown): Appearance {
+  if (!value || typeof value !== 'object') throw new Error('Invalid subtitle appearance');
+  const data = value as Record<string, unknown>;
+  const number = (key: keyof Appearance, min: number, max: number): number => {
+    const item = Number(data[key]);
+    if (!Number.isInteger(item) || item < min || item > max) throw new Error(`Invalid ${key}`);
+    return item;
+  };
+  const color = (key: 'sourceColor' | 'translationColor'): string => {
+    const item = data[key];
+    if (typeof item !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(item)) throw new Error(`Invalid ${key}`);
+    return item;
+  };
+  if (typeof data.showTranslation !== 'boolean') throw new Error('Invalid English display setting');
+  return { showTranslation: data.showTranslation, sourceSize: number('sourceSize', 16, 56),
+    sourceColor: color('sourceColor'), sourceBottom: number('sourceBottom', 4, 35),
+    translationSize: number('translationSize', 16, 56), translationColor: color('translationColor'),
+    translationGap: number('translationGap', 0, 80) };
+}
 
 function validSettings(value: unknown): Settings {
   if (!value || typeof value !== 'object') throw new Error('Invalid settings');
@@ -30,7 +54,8 @@ function validSettings(value: unknown): Settings {
   if (typeof data.includeSecondary !== 'boolean' || typeof data.noKeyRequired !== 'boolean') throw new Error('Invalid settings');
   const endpoint = canonicalEndpoint(String(data.endpoint ?? '')).base;
   return { endpoint, model, sourceLanguage, explanationLanguage,
-    includeSecondary: data.includeSecondary, noKeyRequired: data.noKeyRequired };
+    includeSecondary: data.includeSecondary, noKeyRequired: data.noKeyRequired,
+    appearance: validAppearance(data.appearance) };
 }
 
 export class Session {
@@ -45,6 +70,7 @@ export class Session {
   private source: Cue[] | null = null;
   private secondary: Cue[] = [];
   private pending: PendingSelection | null = null;
+  private lastSelection: { key: string; at: number } | null = null;
   private conversation: Conversation | null = null;
   private nextConversationId = 0;
   private nextStreamId = 0;
@@ -55,10 +81,12 @@ export class Session {
   private windowInitialized = false;
   private overlayPageRequested = false;
   private sidebarReady = false;
+  private sidebarVisible = false;
   private settingsOpen = false;
   private overlayEnabled = true;
   private status = 'Select a subtitle phrase to begin.';
   private cueIdentity = '';
+  private translationText = '';
   private timer: ReturnType<typeof setInterval> | null = null;
   private listeners: Array<{ name: string; id: string }> = [];
   private closed = false;
@@ -66,13 +94,16 @@ export class Session {
   constructor(readonly host: IinaHost) {
     this.credentials = new Credentials(host.raw.utils);
     const stored = host.raw.preferences.get('settings');
-    this.settings = stored && typeof stored === 'object' ? { ...DEFAULTS, ...(stored as object) } : { ...DEFAULTS };
+    this.settings = stored && typeof stored === 'object' ? { ...DEFAULTS, ...(stored as object),
+      appearance: { ...DEFAULT_APPEARANCE, ...((stored as { appearance?: object }).appearance ?? {}) } } : { ...DEFAULTS };
     try { if (this.settings.endpoint) this.hasSavedKey = this.credentials.hasSavedKey(this.settings.endpoint); }
     catch { /* invalid old configuration remains visibly unusable */ }
   }
 
   start(): void {
     const { event } = this.host.raw;
+    const { menu } = this.host.raw;
+    menu.addItem(menu.item('Toggle Language Learning Panel', () => this.togglePanel(), { keyBinding: 'Alt+Meta+g' }));
     const on = (name: string, callback: () => void) => this.listeners.push({ name, id: event.on(name, callback) });
     on('iina.window-loaded', () => this.windowLoaded());
     on('mpv.file-loaded', () => { this.ended = false; this.mediaChanged(); });
@@ -106,26 +137,41 @@ export class Session {
     overlay.onMessage('overlayReady', () => {
       this.overlayReady = true;
       if (this.overlayEnabled) this.host.showOverlay();
+      this.host.toOverlay('appearance', this.settings.appearance);
       this.updateCue(true);
     });
     overlay.onMessage('selected', value => this.selectionReceived(value));
     overlay.onMessage('selectionCleared', () => { this.pending = null; });
-    overlay.onMessage('explain', value => this.explain(value));
     sidebar.loadFile('ui/sidebar.html');
     sidebar.onMessage('sidebarReady', () => { this.sidebarReady = true; this.render(); });
     sidebar.onMessage('followUp', value => this.followUp(value));
     sidebar.onMessage('stop', () => this.stop());
     sidebar.onMessage('retry', () => this.retry());
-    sidebar.onMessage('close', () => this.closeConversation());
+    sidebar.onMessage('close', () => this.hideConversation());
     sidebar.onMessage('disableOverlay', () => this.disableOverlay());
     sidebar.onMessage('enableOverlay', () => this.enableOverlay());
     sidebar.onMessage('saveSettings', value => this.saveSettings(value));
+    sidebar.onMessage('saveAppearance', value => this.saveAppearance(value));
     sidebar.onMessage('settingsView', value => { this.settingsOpen = (value as { open?: unknown })?.open === true; });
     sidebar.onMessage('visibility', value => {
-      if ((value as { hidden?: unknown })?.hidden === true && this.host.windowVisible && this.conversation && !this.settingsOpen) {
-        this.closeConversation();
+      const hidden = (value as { hidden?: unknown })?.hidden;
+      if (hidden === false) this.sidebarVisible = true;
+      if (hidden === true && this.host.windowVisible) {
+        this.sidebarVisible = false;
+        if (this.conversation && !this.settingsOpen) this.hideConversation();
       }
     });
+  }
+
+  private togglePanel(): void {
+    if (this.sidebarVisible) {
+      if (this.conversation && !this.settingsOpen) this.hideConversation();
+      else { this.sidebarVisible = false; this.host.hideSidebar(); }
+    } else {
+      this.host.showSidebar();
+      this.sidebarVisible = true;
+      this.render();
+    }
   }
 
   private readCues(id: number): Cue[] {
@@ -139,16 +185,21 @@ export class Session {
     this.conversation = null;
     this.resume = null;
     this.pending = null;
+    this.lastSelection = null;
     this.mediaEpoch++;
     this.mediaUrl = this.host.mediaUrl;
     this.host.restorePrimary();
+    this.host.restoreSecondary();
     this.sourceId = null;
     this.secondaryId = null;
     this.source = null;
     this.secondary = [];
     this.cueIdentity = '';
+    this.translationText = '';
     if (this.overlayReady) this.host.toOverlay('clear', {});
+    if (this.overlayReady) this.host.toOverlay('translation', '');
     this.host.hideSidebar();
+    this.sidebarVisible = false;
     this.syncTracks();
     this.render();
   }
@@ -160,6 +211,7 @@ export class Session {
     if (sourceId !== this.sourceId) {
       changed = true;
       this.host.restorePrimary();
+      this.host.restoreSecondary();
       this.pending = null;
       if (this.overlayReady) this.host.toOverlay('clear', {});
       this.sourceId = sourceId;
@@ -194,11 +246,19 @@ export class Session {
       if (displayed && (!cue || cue.text !== displayed || Math.abs(cue.startMs - this.host.displayedStartMs) > 50)) {
         cue = null;
         this.host.restorePrimary();
+        this.host.restoreSecondary();
         if (this.status !== mismatch) { this.status = mismatch; this.render(); }
       } else {
         this.host.ownPrimary();
         if (this.status === mismatch) { this.status = 'Select a subtitle phrase to begin.'; this.render(); }
       }
+    }
+    if (cue && this.settings.appearance.showTranslation && this.secondaryId !== null) this.host.ownSecondary();
+    else this.host.restoreSecondary();
+    const translation = cue && this.settings.appearance.showTranslation && this.secondaryId !== null ? this.host.secondaryText : '';
+    if (force || translation !== this.translationText) {
+      this.translationText = translation;
+      this.host.toOverlay('translation', translation);
     }
     const identity = cue ? `${sourceId}:${cue.index}:${cue.text}` : 'none';
     if (force || identity !== this.cueIdentity) {
@@ -223,7 +283,11 @@ export class Session {
     if (!sourceCue || sourceCue.text !== cue.text || start < 0 || end <= start || end > sourceCue.text.length) return;
     const text = sourceCue.text.slice(start, end);
     if (!text.trim() || text.length > 4_000) return;
+    const key = `${this.mediaEpoch}:${this.sourceId}:${sourceCue.index}:${start}:${end}`;
+    if (this.sidebarVisible && this.lastSelection?.key === key && Date.now() - this.lastSelection.at < 500) return;
+    this.lastSelection = { key, at: Date.now() };
     this.pending = { cue: { trackId: this.sourceId!, index: sourceCue.index, text: sourceCue.text }, start, end, text };
+    this.explain(this.pending);
   }
 
   private explain(value: unknown): void {
@@ -254,6 +318,7 @@ export class Session {
       this.settingsOpen = false;
       if (this.sidebarReady) this.host.toSidebar('showConversation', {});
       this.host.showSidebar();
+      this.sidebarVisible = true;
       this.status = 'Preparing explanation…';
       this.render();
       this.launch(this.conversation.beginInitial());
@@ -298,14 +363,28 @@ export class Session {
   private followUp(value: unknown): void {
     if (!this.conversation || !value || typeof value !== 'object') return;
     const question = (value as { question?: unknown }).question;
-    try { this.launch(this.conversation.followUp(typeof question === 'string' ? question : '')); }
+    try {
+      const request = this.conversation.followUp(typeof question === 'string' ? question : '');
+      this.pauseForConversation();
+      this.launch(request);
+    }
     catch (error) { this.status = error instanceof Error ? error.message : 'Could not send follow-up'; this.render(); }
   }
 
   private retry(): void {
     if (!this.conversation) return;
-    try { this.launch(this.conversation.retry()); }
+    try {
+      const request = this.conversation.retry();
+      this.pauseForConversation();
+      this.launch(request);
+    }
     catch (error) { this.status = error instanceof Error ? error.message : 'Retry unavailable'; this.render(); }
+  }
+
+  private pauseForConversation(): void {
+    if (this.resume || !this.host.playable || this.mediaUrl !== this.host.mediaUrl) return;
+    this.resume = { epoch: this.mediaEpoch, url: this.mediaUrl };
+    this.host.pause();
   }
 
   private stop(): void {
@@ -323,16 +402,23 @@ export class Session {
     this.retiring.push(active.stream);
   }
 
-  private closeConversation(): void {
+  private hideConversation(): void {
     if (!this.conversation) return;
     this.conversation.stop();
     this.cancelRequest();
-    this.conversation = null;
     this.host.hideSidebar();
+    this.sidebarVisible = false;
+    this.lastSelection = null;
     const resume = this.resume;
     this.resume = null;
     if (resume && resume.epoch === this.mediaEpoch && resume.url === this.host.mediaUrl && this.host.playable) this.host.resume();
-    this.status = 'Conversation closed.';
+    this.status = 'Conversation saved in this window.';
+    this.render();
+  }
+
+  private closeConversation(): void {
+    this.hideConversation();
+    this.conversation = null;
     this.render();
   }
 
@@ -343,6 +429,7 @@ export class Session {
     this.overlayEnabled = false;
     this.host.hideOverlay();
     this.host.restorePrimary();
+    this.host.restoreSecondary();
     this.status = 'Overlay disabled; native subtitles restored.';
     this.render();
   }
@@ -365,14 +452,29 @@ export class Session {
         if (typeof key !== 'string') throw new Error('Invalid API key');
         this.credentials.save(next.endpoint, key);
       }
-      const changed = JSON.stringify(next) !== JSON.stringify(this.settings) || !!key;
+      const changed = JSON.stringify({ ...next, appearance: undefined }) !== JSON.stringify({ ...this.settings, appearance: undefined }) || !!key;
+      const appearanceChanged = JSON.stringify(next.appearance) !== JSON.stringify(this.settings.appearance);
       this.settings = next;
       this.hasSavedKey = this.credentials.hasSavedKey(next.endpoint);
       this.host.raw.preferences.set('settings', next);
       this.host.raw.preferences.sync();
-      if (changed && this.conversation) { this.closeConversation(); this.host.showSidebar(); }
+      if (changed && this.conversation) { this.closeConversation(); this.host.showSidebar(); this.sidebarVisible = true; }
+      if (appearanceChanged && this.overlayReady) this.host.toOverlay('appearance', next.appearance);
+      if (appearanceChanged) this.updateCue(true);
       this.status = 'Settings saved. No request was sent.';
     } catch (error) { this.status = error instanceof Error ? error.message : 'Could not save settings'; }
+    this.render();
+  }
+
+  private saveAppearance(value: unknown): void {
+    try {
+      this.settings.appearance = validAppearance(value);
+      this.host.raw.preferences.set('settings', this.settings);
+      this.host.raw.preferences.sync();
+      if (this.overlayReady) this.host.toOverlay('appearance', this.settings.appearance);
+      this.updateCue(true);
+      this.status = 'Subtitle appearance saved.';
+    } catch (error) { this.status = error instanceof Error ? error.message : 'Could not save subtitle appearance'; }
     this.render();
   }
 
@@ -413,6 +515,7 @@ export class Session {
     this.resume = null;
     this.pending = null;
     this.host.restorePrimary();
+    this.host.restoreSecondary();
     this.host.hideOverlay();
     if (this.timer) clearInterval(this.timer);
     for (const { name, id } of this.listeners) this.host.raw.event.off(name, id);

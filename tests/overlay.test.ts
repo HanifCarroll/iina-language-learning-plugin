@@ -5,7 +5,7 @@ import { mountOverlay } from '../ui/overlay';
 test('DOM selection survives cue update, while seek clears it', async () => {
   const window = new Window();
   (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;
-  window.document.body.innerHTML = '<div id="cue"></div><div id="actions" hidden><button id="explain"></button><button id="clear"></button></div>';
+  window.document.body.innerHTML = '<div id="wrap"><div id="translation"></div><div id="cue"></div></div>';
   const handlers = new Map<string, (data: string) => void>();
   const sent: string[] = [];
   const state = mountOverlay(window.document as unknown as Document, { onMessage: (name, callback) => { handlers.set(name, callback); }, postMessage: name => { sent.push(name); } });
@@ -18,10 +18,11 @@ test('DOM selection survives cue update, while seek clears it', async () => {
   range.setEnd(cue.firstChild!, 19);
   window.document.getSelection()!.addRange(range);
   cue.dispatchEvent(new window.MouseEvent('mouseup'));
-  await Bun.sleep(5);
+  cue.dispatchEvent(new window.MouseEvent('dblclick'));
+  await Bun.sleep(95);
   expect(cue.textContent).toBe('Ben öyle\nbir insan mıyım?');
   expect(state.pending?.cue.index).toBe(0);
-  expect(sent).toContain('selected');
+  expect(sent.filter(name => name === 'selected')).toHaveLength(1);
   handlers.get('seek')!('');
   expect(state.pending).toBeNull();
   expect(cue.textContent).toBe('Next cue');

@@ -8,7 +8,7 @@
 
 Build an open-source **IINA plugin for macOS** that helps a learner understand dialogue while watching a subtitled video:
 
-> Select a word or phrase → choose **Explain with AI** → read a contextual explanation → ask follow-up questions → close the conversation and automatically resume watching.
+> Select a word or phrase → read a contextual explanation → ask follow-up questions → hide the panel and automatically resume watching.
 
 The first user is learning Turkish through *Leyla ile Mecnun*, with explanations in English. The implementation must use configurable source and explanation languages rather than hard-coding Turkish throughout the application.
 
@@ -22,30 +22,31 @@ On the owner's Mac, using a local video and supplied Turkish/English text subtit
 
 | Area | MVP behavior |
 |---|---|
-| Initial action | One action: **Explain with AI**. No separate Translate or Grammar modes. |
+| Initial action | A completed nonempty text selection automatically starts one explanation. No separate Translate or Grammar modes. |
 | Selection | Single words and arbitrary contiguous phrases use the same action and conversation flow. |
-| Playback pause | Pause when the explanation action is invoked, **not** on hover or selection alone. |
-| Conversation dismissal | **Automatically resume playback** when the user closes the active conversation panel. |
+| Playback pause | Pause when a nonempty text selection is completed. Hover and single clicks without selected text do nothing. |
+| Conversation dismissal | **Automatically resume playback** when the user hides the active conversation panel; keep its chat available in that player window. |
 | Source context | Complete selected cue plus up to **three preceding and three following source cues**. Context size is fixed for the MVP. |
-| Secondary subtitles | Turkish/source text is selectable; English/secondary subtitles remain simultaneously visible through IINA. |
+| Secondary subtitles | Turkish/source text is selectable. An optional stacked mode shows IINA's selected English/secondary track above it, with separate display controls. It starts off; native secondary rendering is restored when that mode is off. |
 | Secondary text in requests | Include available English/secondary subtitle context by default, with a **configurable on/off setting** independent of subtitle visibility. |
 | Initial explanation | Natural meaning, **literal meaning every time**, breakdown, relevant grammar/morphology, and contextual/idiomatic notes. Keep it brief. |
 | Learner profile | A small built-in beginner-learner brief; no editable profile or system-prompt editor yet. |
-| New phrase | Invoking Explain for a new selection starts a new conversation and discards the previous one. Merely selecting text does not discard a conversation. |
+| New phrase | Completing a new selection starts a new conversation and discards the previous one. |
 | Persistence | Conversation content is session-only. No conversation history across application restarts. |
 | Provider | One configurable OpenAI-compatible **Chat Completions** endpoint, API key where required, and exact model ID. |
 | Responses | **Real incremental streaming**, not an animation applied after a buffered response finishes. |
 | Secrets | API credentials in **macOS Keychain using IINA's integration**, never in preferences or ordinary files. |
 | Languages | Explicit source-language and explanation-language settings; initial defaults Turkish and English. |
-| Keyboard | Add an Explain-selection shortcut if supported without conflicting with IINA. The exact binding requires a host-API check. |
+| Keyboard | **⌥⌘G** toggles the Language Learning panel in the installed IINA. |
 
 ### Approved implementation defaults
 
 These settle edge cases for the MVP; they are not additional features requested by the owner:
 
 - The guaranteed first-release input path is local video plus user-supplied external UTF-8 **SRT/VTT** subtitles, including full-length files within the agreed limits. Complete commercial tracks are valid user-supplied runtime inputs; do not commit or distribute them as fixtures. Verify how IINA exposes the selected external file. Do not silently promise complete support for every embedded subtitle format.
-- Closing a conversation means returning to playback of the **same playable media**, including when it was already paused before Explain. Never start a different file or restart ended/stopped playback as a side effect.
-- Closing the panel may retain its most recent conversation in memory for reopening in that player window; there is no history list. A new Explain action, media change, or window close clears it.
+- Hiding a conversation means returning to playback of the **same playable media**, including when it was already paused before selection. Never start a different file or restart ended/stopped playback as a side effect.
+- Hiding the panel retains its most recent conversation in memory for reopening in that player window, including incomplete output from a cancelled stream. A new completed selection, media change, window close, provider/language/context change, or Disable Overlay clears it. There is no history list.
+- Sending a follow-up or retry after reopening a retained conversation pauses the same playable media again; hiding the panel resumes it under the same ownership rules.
 - The built-in learner brief assumes a beginner in the configured source language, with grammatical terminology briefly explained. Do not embed the owner's personal biography or presume every user knows Spanish.
 - The approved TypeScript/DOM architecture and packaged Swift helper are recorded in `IMPLEMENTATION_PLAN.md`. The local plugin identifier and MIT source license are recorded there; any release decision remains separate.
 
@@ -53,7 +54,7 @@ These settle edge cases for the MVP; they are not additional features requested 
 
 ### Included
 
-Selectable current-source-subtitle overlay; one explanation action; contextual LLM requests; streamed initial and follow-up responses in an IINA sidebar; dual-subtitle coexistence; the settings above; Keychain credential replacement; clear loading/error/cancellation states; install/build/test documentation.
+Selectable current-source-subtitle overlay; automatic explanation on a completed selection; contextual LLM requests; streamed initial and follow-up responses in an IINA sidebar; dual-subtitle coexistence; the settings above; Keychain credential replacement; clear loading/error/cancellation states; install/build/test documentation.
 
 ### Explicitly excluded
 
@@ -65,24 +66,24 @@ Do not add roadmap features because a reference project or the mockup contains t
 
 The approved concept is bundled as [`docs/ui-reference.png`](docs/ui-reference.png). It is **visual guidance, not a feature inventory or an exact rendering guarantee**.
 
-Preserve its overall composition: unobtrusive selectable subtitles over the existing video, a compact selection action, and a dark, readable right-hand explanation/chat sidebar. Use normal macOS/IINA interaction conventions and usable contrast. Do not reproduce the image's Transcript, Vocabulary, Add to vocabulary, or extra action controls.
+Preserve its overall composition: unobtrusive selectable subtitles over the existing video and a dark, readable right-hand explanation/chat sidebar. Use normal macOS/IINA interaction conventions and usable contrast. Do not reproduce the image's Transcript, Vocabulary, Add to vocabulary, or extra action controls.
 
 ### Subtitle overlay
 
-- Render source text near the ordinary primary-subtitle position, maintaining readable sizing, wrapping, Turkish diacritics, and multiline text.
+- Render source text near the ordinary primary-subtitle position, maintaining readable sizing, wrapping, Turkish diacritics, and multiline text. Showing the selection action must not move the subtitle text.
 - Permit word selection and arbitrary contiguous text ranges within the displayed cue, including ranges that cross its visual line breaks. Do not require a special learning mode or modifier key by default.
-- A click may select a word; dragging selects a range. Neither starts a network request. Both lead to the same **Explain with AI** action.
+- Double-clicking selects a word; dragging selects a range. Completing a nonempty selection starts the explanation and may incur a provider charge. A single click without selected text does nothing. Coalesce mouseup and double-click delivery so one gesture creates one request.
 - Preserve the exact selected text and its relationship to the displayed source cue. Do not lowercase, translate, or retokenize the user's selection before sending it.
-- An empty or whitespace-only selection has no actionable menu.
-- Keep normal IINA controls and video interactions working outside the subtitle/action hit areas. Do not place a full-window invisible input blocker over the video.
-- Freeze the selection's text snapshot while a drag or its action menu is active, without pausing playback. Natural cue advancement must not silently change a pending selection, including while the drag is active. A user seek clears an uninvoked selection. Dismissing a pending selection returns the overlay to the current playback cue.
-- If Explain is invoked after playback has advanced, explain the captured cue; do not substitute the new cue or automatically seek backward.
+- Empty or whitespace-only selections do nothing.
+- Keep normal IINA controls and video interactions working outside the subtitle hit area. Do not place a full-window invisible input blocker over the video.
+- Freeze the selection's text snapshot while a drag is active, without pausing playback until the selection is completed. Natural cue advancement must not silently change the selected cue, including while the drag is active. A user seek clears an uncompleted selection.
+- If playback advances during a drag, explain the captured cue on completion; do not substitute the new cue or automatically seek backward.
 
 ### Conversation sidebar
 
-Display the selected phrase, its complete source cue, an optional timestamp, streamed messages, a multiline follow-up composer, Send, Stop while generating, Retry after an eligible error, and a clear Close/Resume control. A settings link may open the plugin's provider/language settings.
+Display the selected phrase, its complete source cue, an optional timestamp, streamed messages, a multiline follow-up composer, Send, Stop while generating, Retry after an eligible error, and a clear Hide/Resume control. A settings link may open the plugin's provider/language and subtitle appearance settings.
 
-Use one conversation view, not separate explanation and chat products. Keep the selected phrase identifiable while scrolling. Enter submits; Shift+Enter inserts a newline, respecting text-composition input. Typing spaces or using the Explain shortcut in a text input must not inadvertently control playback.
+Use one conversation view, not separate explanation and chat products. Keep the selected phrase identifiable while scrolling. Enter submits; Shift+Enter inserts a newline, respecting text-composition input. Typing spaces in a text input must not inadvertently control playback.
 
 Keep the composer and its controls visible at the bottom of an open conversation. Start the input at one line, grow it to three lines, then scroll inside it. Messages scroll independently above the composer. Bring a newly sent follow-up into view and follow incoming text while the reader is near the bottom; if the reader scrolls up, preserve that reading position through stream updates.
 
@@ -90,9 +91,9 @@ The initial explanation should visibly distinguish **Natural meaning** and **Lit
 
 ### Dual-subtitle presentation
 
-The plugin renders selectable **primary/source** text. IINA renders the **secondary/translation** track natively. Suppress only duplicate native primary rendering; keep the primary track selected/decoded and leave native secondary visibility under the user's control.
+The plugin renders selectable **primary/source** text. Its optional stacked mode also draws IINA's current **secondary/translation** text immediately above the source and suppresses the duplicate native secondary rendering while the source overlay is active. The two lines have separate size and color controls; source distance from the bottom and secondary gap above source control their placement. The secondary context sent to AI remains an independent setting. When stacked mode is off, IINA renders the secondary track natively.
 
-Simultaneous visibility is required; a particular top/bottom arrangement is not. Respect native secondary positioning and document how to avoid overlap. Do not silently reposition a user's subtitles permanently to match the concept image. mpv documents independent primary/secondary visibility and current-text properties, but behavior must be tested in IINA's bundled version. [R4]
+Restore only the native visibility state owned by this window on track/media changes, overlay disable, and teardown. Do not permanently alter the user's IINA subtitle preferences. The installed IINA 1.5.0-beta2 displayed a synthetic secondary cue above Turkish in this mode; further visual and timing checks remain in the acceptance report. [R4]
 
 ## 5. Interaction lifecycle
 
@@ -100,31 +101,29 @@ Simultaneous visibility is required; a particular top/bottom arrangement is not.
 
 1. The user opens a video and selects subtitle tracks using IINA.
 2. The plugin shows selectable source text; secondary subtitles remain visible if enabled in IINA.
-3. The user selects a word or phrase. Playback continues.
-4. The user invokes **Explain with AI** or the supported equivalent shortcut.
-5. Capture an immutable selection/context snapshot, pause playback, and open the sidebar. Validate configuration before transmitting anything.
-6. Send one request to the configured provider and stream its answer into the sidebar.
-7. A follow-up sends the original context plus the completed conversation turns and the new user question. It does not rebind to whatever subtitle is now playing.
-8. Closing the active conversation cancels any outstanding response and automatically resumes the same playable media. Settings dismissal alone does not resume playback.
+3. The user completes a word or phrase selection. Capture an immutable selection/context snapshot, pause playback, and open the sidebar. Validate configuration before transmitting anything.
+4. Send one request to the configured provider and stream its answer into the sidebar.
+5. A follow-up sends the original context plus the completed conversation turns and the new user question. It does not rebind to whatever subtitle is now playing.
+6. Hiding the active conversation cancels any outstanding response, retains the conversation, and automatically resumes the same playable media. Settings dismissal alone does not resume playback. Reopening the panel shows the retained chat; the next completed selection replaces it.
 
 ### State and side-effect rules
 
 | Event | Required behavior |
 |---|---|
-| Another Explain action | Cancel/invalidate the prior request, discard the old conversation, capture the new selection, and start once. |
-| Duplicate action while starting | Do not create duplicate billable requests for the same action. |
+| Another completed selection | Cancel/invalidate the prior request, discard the old conversation, capture the new selection, and start once. |
+| Duplicate selection delivery | Do not create duplicate billable requests from mouseup plus double-click for the same gesture. |
 | Follow-up during generation | Disable Send until the response completes or is stopped; do not queue hidden requests. |
 | Stop | Attempt transport cancellation, preserve partial text as **incomplete**, and remain paused. |
-| Close panel during generation | Cancel/invalidate the request, close the panel, resume eligible playback, and ignore late results. |
+| Hide panel during generation | Cancel/invalidate the request, mark partial output incomplete, retain the chat, resume eligible playback, and ignore late results. |
 | Natural cue advancement | Keep a pending selection and its cue frozen, including a cue change during an active drag; after dismissal, show the current cue. An existing conversation retains its captured context. |
-| Seek within the same media | Live overlay follows playback; an existing conversation keeps its original context. Uninvoked stale selections are cleared. |
-| Change source track | Clear the uninvoked selection and refresh source context. An open conversation remains attached to its captured track/cue and visibly retains that source. |
+| Seek within the same media | Live overlay follows playback; an existing conversation keeps its original context. Uncompleted selections are cleared. |
+| Change source track | Clear an uncompleted selection and refresh source context. An open conversation remains attached to its captured track/cue and visibly retains that source. |
 | Open a different video / close player window | Cancel work; clear conversation, selection, and cue caches; never resume the old or newly opened file due to a stale close callback. |
-| In-plugin Disable Overlay / overlay failure | Cancel active work, invalidate late results, close the conversation under the same-media resume rules, restore the native primary-subtitle state owned by this window, and remove handlers. Test this during an active stream. Do not hijack another window's playback. |
-| Raw disable in IINA Preferences | IINA 1.5.0-beta2 offers no plugin teardown callback. Native primary subtitles can remain hidden, playback can remain paused, and an active helper request can continue until its bounded total timeout. Document manual recovery through **Subtitles → Show Subtitles** and, when needed, **Playback → Resume**. Do not claim immediate cancellation or prevention of provider billing on this path. |
+| In-plugin Disable Overlay / overlay failure | Cancel active work, invalidate late results, close the conversation under the same-media resume rules, restore native primary and secondary visibility owned by this window, and remove handlers. Test this during an active stream. Do not hijack another window's playback. |
+| Raw disable in IINA Preferences | IINA 1.5.0-beta2 offers no plugin teardown callback. Native primary or secondary subtitles can remain hidden, playback can remain paused, and an active helper request can continue until its bounded total timeout. Document manual recovery through **Subtitles → Show Subtitles**, **Subtitles → Show Secondary Subtitles** when needed, and **Playback → Resume** when needed. Do not claim immediate cancellation or prevention of provider billing on this path. |
 | Multiple IINA windows | Each owns its own selection, conversation, request, and playback-resume state. Preferences may be shared. |
 
-Distinguish **Stop generating**, **Close/Resume**, and **application/window teardown**. Do not implement all three with a generic “toggle pause.” Explicit native-sidebar dismissal should match Close/Resume where the host exposes a reliable notification; verify this before promising it. Any inability to detect native close requires a proposed UX adjustment, not a hidden discrepancy.
+Distinguish **Stop generating**, **Hide/Resume**, and **application/window teardown**. Do not implement all three with a generic “toggle pause.” Explicit native-sidebar dismissal should match Hide/Resume where the host exposes a reliable notification; verify this before promising it. Any inability to detect native close requires a proposed UX adjustment, not a hidden discrepancy.
 
 ## 6. Subtitle acquisition and context
 
@@ -267,7 +266,7 @@ The Phase 0 spike and subsequent packaged-helper/UI milestone ran against the ac
 | Neighboring cues | Read the selected external track, obtain the next three cues before they play, and account for track changes/delays without seeking. [R5] |
 | Keychain | Verify actual method casing, availability, successful save/read/replace and failure handling. [R1, R2] |
 | Stream + cancellation | A controlled endpoint emits multiple delayed chunks; the sidebar receives them **before completion**. Prove JSON request encoding, authentication boundaries, cancellation, and error handling. |
-| Sidebar lifecycle | Establish actual close/hide events and how explicit Close/Resume interacts with native dismissal, fullscreen, text focus, and multiple windows. [R8] |
+| Sidebar lifecycle | Establish actual close/hide events and how explicit Hide/Resume interacts with native dismissal, fullscreen, text focus, and multiple windows. [R8] |
 | Package / permissions | Development linking and a reproducible installable package work; justify every requested permission and any allowed-domain wildcard. |
 
 ### Streaming decision and remaining checks
@@ -278,7 +277,7 @@ The owner approved the packaged Swift `URLSession` helper and its `video-overlay
 
 In installed IINA, the packaged helper delivered delayed chunks before completion; Stop cancellation, loopback authentication/redirect boundaries, first-byte/idle/total timeouts, and normal IINA-exit cleanup were observed. The `utils.exec` stdout hook runs on a background queue and **must only queue bytes**. A plugin timer drains those bytes before any IINA host API, WebView, or file operation. This tested pattern does not eliminate every host-level concurrency risk. Product cancellation, media replacement, teardown, HTTPS/TLS, and active-stream Disable Overlay still need acceptance tests.
 
-Raw IINA Preferences disable provides no plugin teardown callback and can leave the helper running to its total request timeout, native primary subtitles hidden, and playback paused. It cannot guarantee immediate cancellation or prevent provider billing. The in-plugin Disable Overlay control is the supported safe shutdown path. Manual recovery after raw disable is documented in A07; no IINA fork or host patch is required.
+Raw IINA Preferences disable provides no plugin teardown callback and can leave the helper running to its total request timeout, native primary or secondary subtitles hidden, and playback paused. It cannot guarantee immediate cancellation or prevent provider billing. The in-plugin Disable Overlay control is the supported safe shutdown path. Manual recovery after raw disable is documented in A07; no IINA fork or host patch is required.
 
 ## 11. Acceptance scenarios
 
@@ -286,20 +285,20 @@ Use synthetic fixtures rather than distributing television episodes or complete 
 
 | ID | Scenario and expected result |
 |---|---|
-| A01 | **Word:** select `mıyım` and invoke Explain. Exact text and the full cue enter one request; playback pauses; the sidebar opens. |
+| A01 | **Word:** double-click `mıyım`. Exact text and the full cue enter one request automatically; playback pauses; the sidebar opens. |
 | A02 | **Phrase:** drag-select `öyle bir insan`, including across a rendered line break. It is treated as one selection and follows the same action flow. |
-| A03 | **No unintended action:** hover, select, or click away without Explain. No request and no automatic pause occur. |
-| A04 | **Cue race versus seek:** natural cue advancement, including a change during an active drag, freezes the pending selection and original cue. A user seek clears an uninvoked selection. An existing conversation retains its original context through both events. Test these separately. |
+| A03 | **No unintended action:** hover or single-click without selected text causes no request or pause. A completed nonempty selection starts exactly one request; mouseup plus double-click must not duplicate it. |
+| A04 | **Cue race versus seek:** natural cue advancement, including a change during an active drag, freezes the pending selection and original cue. A user seek clears an uncompleted selection. An existing conversation retains its original context through both events. Test these separately. |
 | A05 | **Full context:** a middle cue receives three existing preceding and following cues in order, even before following cues have played. Track boundaries produce fewer legitimate neighbors. |
 | A06 | **Timing:** repeated text, seek, and subtitle-delay changes resolve the correct timeline location; stale neighbors are not reused. |
-| A07 | **Dual display and recovery:** selectable Turkish and native English appear at once without duplicate Turkish text. During an active stream, in-plugin Disable Overlay cancels work, invalidates late results, closes/resumes eligible playback, and restores the native-primary state owned by that window. Raw IINA Preferences disable may leave a helper running until total timeout, native primary hidden, and playback paused on IINA 1.5.0-beta2; billing may continue. Recover with **Subtitles → Show Subtitles** and, if paused, **Playback → Resume**. Test both paths. |
+| A07 | **Dual display and recovery:** selectable Turkish and stacked English appear at once without duplicate native text; source and secondary size, color, and vertical placement controls work. Turning stacked mode off restores native secondary rendering. During an active stream, in-plugin Disable Overlay cancels work, invalidates late results, closes/resumes eligible playback, and restores native subtitle visibility owned by that window. Raw IINA Preferences disable may leave a helper running until total timeout, native subtitles hidden, and playback paused on IINA 1.5.0-beta2; billing may continue. Recover with **Subtitles → Show Subtitles**, **Subtitles → Show Secondary Subtitles** if needed, and **Playback → Resume** if paused. Test both paths. |
 | A08 | **Secondary context:** enabled attaches the relevant available translation; disabled omits it while English remains visible. Disabling mid-conversation prevents old automatically attached translation context from being resent. |
 | A09 | **Meaning contract:** the initial prompt always requires both Natural meaning and Literal meaning, plus relevant breakdown/grammar. A small manual model sample is reviewed for quality; unit tests do not pretend to prove linguistic correctness. |
 | A10 | **Follow-up:** ask `Why is bir used here?`. Preserve the original phrase/cue/context, completed prior turns, and new question without recapturing live subtitles. |
-| A11 | **New selection:** invoking Explain for a different phrase replaces the conversation; previous late chunks cannot appear in the new response. |
+| A11 | **New selection:** completing a different phrase selection replaces the conversation; previous late chunks cannot appear in the new response. |
 | A12 | **Real stream:** delayed SSE chunks update the sidebar incrementally; split UTF-8, multiline/event boundaries and completion markers are handled correctly. The stdout hook only queues bytes; a timer performs all host/UI work. Test cancellation, media replacement, and teardown without claiming universal host-level concurrency safety. |
-| A13 | **Stop vs close:** Stop cancels and remains paused. Close cancels if needed and resumes the same playable video. Partial output is marked incomplete. |
-| A14 | **Close edge cases:** closing settings does not resume; closing a conversation on ended/stopped/different media does not start playback; native sidebar dismissal follows the verified behavior. |
+| A13 | **Stop vs hide:** Stop cancels and remains paused. Hide cancels if needed, keeps the chat, and resumes the same playable video. Partial output is marked incomplete and late chunks are rejected. |
+| A14 | **Hide edge cases:** closing settings does not resume; hiding a conversation on ended/stopped/different media does not start playback; native sidebar dismissal retains chat. Reopening by ⌥⌘G shows it, and a subsequent selection replaces it. |
 | A15 | **Isolation:** simultaneous requests in two player windows and a media change do not mix subtitles, API responses, or pause/resume effects. |
 | A16 | **Configuration:** missing/invalid URL, model, or required credentials produces actionable UI and no accidental request. Saving settings alone sends no subtitles. |
 | A17 | **Credentials:** disposable key survives restart and can be replaced through verified Keychain calls. Read/write failure never creates plaintext fallback, false success, or secret-bearing diagnostics. |
@@ -307,7 +306,7 @@ Use synthetic fixtures rather than distributing television episodes or complete 
 | A19 | **Failures and transport security:** HTTPS/TLS validation, redirect/authentication boundaries, authentication/authorization error, rate limit, provider outage, timeout, invalid JSON/SSE, and interrupted stream produce clear states; retries are manual and not duplicated. |
 | A20 | **Untrusted text:** subtitle/model HTML, script-like content, prompt-injection text, and forged bridge messages cannot execute code, redirect privileged requests, or reveal the stored key. |
 | A21 | **Unsupported input:** no subtitle, empty cue, unreadable file, malformed track, and bitmap/unsupported embedded track leave native playback/subtitles usable and explain the limitation. |
-| A22 | **UI integration:** window resize, fullscreen selection, ordinary IINA controls, keyboard selection/action where supported, sidebar/composer focus and native dismissal, and Turkish characters remain usable. |
+| A22 | **UI integration:** selecting text does not move the subtitle; window resize, fullscreen selection, ordinary IINA controls, ⌥⌘G panel toggle, sidebar/composer focus and native dismissal, and Turkish characters remain usable. |
 | A23 | **Session lifecycle:** latest conversation is memory-only; a new media session/restart has no previous chat. Non-secret settings and the saved Keychain credential persist as intended. |
 | A24 | **Boundaries:** oversized input/history produces a documented visible limit; no silent context corruption, hidden summarization request, or automatic stronger-model escalation. |
 

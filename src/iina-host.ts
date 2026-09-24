@@ -16,6 +16,7 @@ export type RawIina = {
     postMessage(name: string, value: string): void; show(): void; hide(): void; setClickable(value: boolean): void };
   sidebar: { loadFile(path: string): void; onMessage(name: string, callback: (data: unknown) => void): void;
     postMessage(name: string, value: string): void; show(): void; hide(): void };
+  menu: { item(title: string, action: () => void, options: { keyBinding: string }): unknown; addItem(item: unknown): void };
   preferences: { get(name: string): unknown; set(name: string, value: unknown): void; sync(): void };
   utils: Keychain & { resolvePath(path: string): string;
     exec(path: string, args: string[], cwd: null, stdout: (chunk: string) => void, stderr: null): Promise<{ status: number }> };
@@ -23,6 +24,7 @@ export type RawIina = {
 
 export class IinaHost {
   private ownedPrimary: boolean | null = null;
+  private ownedSecondary: boolean | null = null;
   constructor(readonly raw: RawIina, private readonly pluginId: string) {}
 
   get mediaUrl(): string { return this.raw.core.status.url || ''; }
@@ -61,6 +63,19 @@ export class IinaHost {
     if (this.ownedPrimary === null) return;
     if (this.raw.mpv.getFlag('sub-visibility') === false) this.raw.mpv.set('sub-visibility', this.ownedPrimary);
     this.ownedPrimary = null;
+  }
+
+  ownSecondary(): void {
+    if (this.ownedSecondary !== null) return;
+    this.ownedSecondary = !!this.raw.mpv.getFlag('secondary-sub-visibility');
+    this.raw.mpv.set('secondary-sub-visibility', false);
+  }
+
+  restoreSecondary(): void {
+    if (this.ownedSecondary === null) return;
+    if (this.raw.mpv.getFlag('secondary-sub-visibility') === false)
+      this.raw.mpv.set('secondary-sub-visibility', this.ownedSecondary);
+    this.ownedSecondary = null;
   }
 
   pause(): void { this.raw.core.pause(); }

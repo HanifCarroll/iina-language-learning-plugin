@@ -6,7 +6,9 @@ type ViewState = {
   status: string; open: boolean; conversationId: number | null; overlayEnabled: boolean; phrase: string; cue: string;
   turns: Array<{ question: string; answer: string; status: string; error?: string }>;
   settings: { endpoint: string; model: string; sourceLanguage: string; explanationLanguage: string;
-    includeSecondary: boolean; noKeyRequired: boolean; hasSavedKey: boolean; requestUrl: string };
+    includeSecondary: boolean; noKeyRequired: boolean; hasSavedKey: boolean; requestUrl: string;
+    appearance: { showTranslation: boolean; sourceSize: number; sourceColor: string; sourceBottom: number;
+      translationSize: number; translationColor: string; translationGap: number } };
 };
 
 const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
@@ -95,6 +97,11 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     }
     element<HTMLInputElement>('includeSecondary').checked = state.settings.includeSecondary;
     element<HTMLInputElement>('noKeyRequired').checked = state.settings.noKeyRequired;
+    element<HTMLInputElement>('showTranslation').checked = state.settings.appearance.showTranslation;
+    for (const key of ['sourceSize', 'sourceColor', 'sourceBottom', 'translationSize', 'translationColor', 'translationGap'] as const) {
+      const input = element<HTMLInputElement>(key);
+      if (doc.activeElement !== input) input.value = String(state.settings.appearance[key]);
+    }
     element('keyStatus').textContent = state.settings.hasSavedKey ? 'A key is saved for this endpoint.' : 'No key is saved for this endpoint.';
     element('requestUrl').textContent = state.settings.requestUrl ? `Requests go to ${state.settings.requestUrl}` : '';
   }
@@ -107,6 +114,18 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     resizeQuestion();
   }
 
+  function readAppearance(): ViewState['settings']['appearance'] {
+    return {
+      showTranslation: element<HTMLInputElement>('showTranslation').checked,
+      sourceSize: Number(element<HTMLInputElement>('sourceSize').value),
+      sourceColor: element<HTMLInputElement>('sourceColor').value,
+      sourceBottom: Number(element<HTMLInputElement>('sourceBottom').value),
+      translationSize: Number(element<HTMLInputElement>('translationSize').value),
+      translationColor: element<HTMLInputElement>('translationColor').value,
+      translationGap: Number(element<HTMLInputElement>('translationGap').value)
+    };
+  }
+
   element('settingsToggle').addEventListener('click', () => { settingsOpen = true; bridge.postMessage('settingsView', { open: true }); render(); });
   element('back').addEventListener('click', () => { settingsOpen = false; bridge.postMessage('settingsView', { open: false }); render(); });
   element('send').addEventListener('click', sendQuestion);
@@ -114,6 +133,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   element('retry').addEventListener('click', () => bridge.postMessage('retry', {}));
   element('close').addEventListener('click', () => bridge.postMessage('close', {}));
   element('disableOverlay').addEventListener('click', () => bridge.postMessage(state?.overlayEnabled ? 'disableOverlay' : 'enableOverlay', {}));
+  element('saveAppearance').addEventListener('click', () => bridge.postMessage('saveAppearance', readAppearance()));
   element('saveSettings').addEventListener('click', () => {
     const keyInput = element<HTMLInputElement>('apiKey');
     const payload = {
@@ -123,6 +143,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       explanationLanguage: element<HTMLInputElement>('explanationLanguage').value,
       includeSecondary: element<HTMLInputElement>('includeSecondary').checked,
       noKeyRequired: element<HTMLInputElement>('noKeyRequired').checked,
+      appearance: readAppearance(),
       key: keyInput.value
     };
     keyInput.value = '';
@@ -145,6 +166,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   bridge.onMessage('showConversation', () => { settingsOpen = false; render(); });
   doc.addEventListener('visibilitychange', () => bridge.postMessage('visibility', { hidden: doc.hidden }));
   bridge.postMessage('sidebarReady', {});
+  bridge.postMessage('visibility', { hidden: doc.hidden });
 }
 
 if (typeof document !== 'undefined' && typeof iina !== 'undefined') mountSidebar(document, iina);
