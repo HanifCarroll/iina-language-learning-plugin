@@ -1,8 +1,8 @@
-# IINA Language Learning — MVP Specification
+# Neden — MVP Specification
 
 **Version:** 0.1 · **Date:** September 23, 2026  
 **Status:** Behavior source of truth. The owner approved the architecture and remaining implementation after the installed-IINA integration milestone. Historical Phase 0 evidence remains in [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) and [INTEGRATION_MILESTONE.md](../INTEGRATION_MILESTONE.md). Current product test results and outstanding checks are in [ACCEPTANCE_REPORT.md](../ACCEPTANCE_REPORT.md).
-**Project name:** IINA Language Learning. The local plugin identifier is `io.github.hanifcarroll.iina-language-learning`.
+**Project name:** Neden. The established local plugin identifier remains `io.github.hanifcarroll.iina-language-learning` to preserve installed settings and Keychain identity.
 
 ## 1. Product intent
 
@@ -38,7 +38,7 @@ On the owner's Mac, using a local video and supplied Turkish/English text subtit
 | Responses | **Real incremental streaming**, not an animation applied after a buffered response finishes. |
 | Secrets | API credentials in **macOS Keychain using IINA's integration**, never in preferences or ordinary files. |
 | Languages | Explicit source-language and explanation-language settings; initial defaults Turkish and English. |
-| Keyboard | **⌥⌘G** toggles the Language Learning panel in the installed IINA. |
+| Keyboard | **⌥⌘G** toggles the Neden panel in the installed IINA. |
 
 ### Approved implementation defaults
 

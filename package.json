@@ -5,7 +5,8 @@
     "test": "bun test",
     "evals": "bun tests/eval_runner.ts",
     "build": "sh scripts/build.sh",
-    "package": "sh scripts/package.sh"
+    "package": "sh scripts/package.sh",
+    "release:check": "sh scripts/release-check.sh"
   },
   "dependencies": {
     "markdown-it": "15.0.2"

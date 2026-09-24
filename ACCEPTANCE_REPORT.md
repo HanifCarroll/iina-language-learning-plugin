@@ -1,6 +1,12 @@
 # Product acceptance evidence
 
-**Status (2026-09-24):** the approved MVP and version 0.1.8 subtitle-menu changes have been tested locally. This is not a release or a claim that all A01–A24 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
+**Status (2026-09-24):** the approved MVP and version 0.1.8 subtitle-menu changes have been tested locally. The current release candidate is named **Neden** and numbered 0.1.9. This is not a release or a claim that all A01–A24 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
+
+## Neden 0.1.9 release preparation
+
+The visible package, sidebar tab, sidebar heading, and plugin menu use **Neden**. The established identifier remains unchanged to preserve installed settings and Keychain identity. The root `Info.json` now has a description, intended GitHub repository path, and integer update version; that repository is not yet live. A local release check removes old archives from ignored `dist/`, runs 49 Bun tests and actual TypeScript typechecking, compiles the arm64 Swift helper, packages a 0.1.9 archive, checks its integrity and required members, and runs 10 controlled helper tests. All passed on macOS 27.0 with IINA 1.5.0-beta2's packer. The archive contains the helper and third-party license notices, with no media or subtitle fixtures. The full-history pattern scan found no apparent credentials; only synthetic subtitle fixtures are tracked. The result is local-only and has not been installed or tested in IINA as version 0.1.9.
+
+The release gate does not prove a first-run GitHub install, automatic updates, or the remaining native A01–A24 checks below. The intended repository URL does not exist yet, and no source push, release asset, or community-list submission has been made.
 
 ## Installed IINA subtitle menu and package layout (version 0.1.8)
 

@@ -1,46 +1,41 @@
-# IINA Language Learning
+# Neden
 
-A macOS IINA plugin for selecting an external source subtitle phrase and asking an AI provider to explain it. The explanation streams into IINA's sidebar. Chat lasts only for the current media session.
+A pre-release IINA plugin that lets you select a subtitle phrase, read an AI explanation in context, and ask follow-up questions without leaving the video.
 
-## Tested environment
+Tested on **macOS 27.0** and **IINA 1.5.0-beta2**. The packaged helper was built and tested on Apple silicon. Other combinations have not been tested.
 
-macOS 27 on Apple silicon, IINA 1.5.0-beta2 (build 172), and its bundled mpv. Other versions are not yet verified. The plugin supports full-length user-supplied UTF-8 SRT and WebVTT files, subject to the limits below. Embedded or bitmap tracks remain available in IINA, but selectable explanations require an external text track. Complete commercial subtitle tracks are valid runtime input; none are included in this repository.
+## Install the current local build
 
-## Build and install
-
-Install Bun, Swift/Xcode command-line tools, and IINA. Then run:
+Install [Bun](https://bun.sh/), Swift/Xcode command-line tools, and IINA. From a clean checkout:
 
 ```sh
 bun install --frozen-lockfile
-bun test
-bun run package
-python3 tests/test_stream_helper.py dist/io.github.hanifcarroll.iina-language-learning.iinaplugin/native/stream-helper
+bun run release:check
 ```
 
-Packaging runs `tsc --noEmit`, compiles the Swift helper, and writes the ignored `.iinaplugin` folder and `.iinaplgz` archive under `dist/`. Install the archive through IINA's plugin settings. Old package archives are disposable build outputs; Git history keeps the source for older versions. Version 0.1.8 initializes in an already loaded player window; if the Language Learning sidebar is temporarily empty after reinstalling, reopen it or restart IINA. The project does not modify IINA itself.
+In IINA's plugin settings, choose **Install Local Package** and select `dist/io.github.hanifcarroll.iina-language-learning.iinaplugin-0.1.9.iinaplgz`. Restart IINA after an update; hot plugin reload crashed in one test of IINA 1.5.0-beta2. The GitHub repository installation route will be available only after a public release with an archive asset is published.
 
-## Use
+## Use it
 
-1. Open a video in IINA. Under **Plugin → IINA Language Learning**, use **Add SRT/VTT File…** to add each subtitle file, then choose the Turkish track under **Source Subtitle** and the English track under **Secondary Subtitle**. IINA's native subtitle controls still work. To show English above Turkish, enable **Show secondary subtitle above source** in plugin Settings. This option starts off. The plugin draws the secondary line above its selectable source line and temporarily hides IINA's duplicate native text. Adjust each line's size and color, the source distance from the bottom, and the gap between lines. Turning off stacked display restores native secondary rendering.
-2. Open the Language Learning sidebar and enter an HTTPS API base URL and model. The plugin appends `/chat/completions`. HTTP is accepted only for `localhost`, `127.0.0.1`, or `::1` test endpoints. Enter an API key unless the endpoint needs none. Save settings before selecting text. A newly entered key goes directly to the plugin's verified IINA Keychain API; saved keys are never shown in the sidebar.
-3. Double-click a word or drag across a phrase in the source subtitle. Completing the selection pauses playback, opens the conversation, and sends one request to the configured provider; a single click without selected text does nothing. Send follow-ups from the same sidebar. **Stop** marks partial output incomplete; **Retry** manually starts a new request for that turn. **Hide / Resume** hides the panel, keeps the chat in this window, and resumes eligible playback of the same media. Press **⌥⌘G** to hide or reopen the panel. A follow-up after reopening pauses playback again; the next selected phrase replaces the previous conversation.
+1. Open a video. In **Plugin → Neden**, choose **Add SRT/VTT File…** for a user-supplied UTF-8 source subtitle file. Select it under **Source Subtitle**. Add and choose an optional translation file under **Secondary Subtitle**. Selectable explanations require an external SRT or VTT source track.
+2. Open the plugin sidebar and enter an OpenAI-compatible HTTPS API base URL and exact model ID. Enter a key if that endpoint requires one. The plugin appends `/chat/completions` to the base URL. Saving settings does not send a request.
+3. Double-click a source word or drag across a phrase. Completing the selection pauses playback and **immediately sends one request**. It may incur a provider charge. A click without selected text does nothing.
+4. Read the streamed explanation and ask follow-ups in the same chat. **Stop** marks a partial answer incomplete. **Hide / Resume** retains the chat in that player window and resumes eligible playback. **⌥⌘G** hides or reopens the sidebar. Selecting another phrase replaces the chat.
 
-Changing provider, language, or secondary-context settings ends an open conversation; make a fresh selection to use the new settings. The secondary subtitle display is independent of whether its text is included in AI context. Subtitle appearance can be changed without clearing chat. The sidebar formats model Markdown locally with HTML, links, and image loading disabled. The complete source cue is available through **Full subtitle line**; subtitle content remains plain text. The follow-up input grows to three lines, while the message list scrolls above it. A new follow-up scrolls into view; streaming follows the bottom unless you scroll up to read.
+The optional **Show secondary subtitle above source** setting draws the translation above the selectable source line. Size, color, and vertical spacing can be adjusted separately. This display setting is independent of **Include secondary text in AI context**. To put plugin sidebars on the right in the tested IINA version, use **Video → Show Video Panel → Layout → Sidebar Position → Plugins**; that IINA setting affects all plugin sidebars.
 
-To put the plugin sidebar on the right in IINA 1.5.0-beta2, open **Video → Show Video Panel → Layout → Sidebar Position** and select the trailing side for **Plugins**. This is an IINA setting for all plugin sidebars, not a setting of this plugin alone.
+## Privacy and limits
 
-**Disable Overlay** in plugin Settings is the supported safe shutdown control. It cancels active work, closes the conversation under the same-media resume rule, and restores native subtitle visibility owned by that window. Raw disable in IINA Preferences does not call plugin cleanup in IINA 1.5.0-beta2. In that case a helper can run until its 120-second total timeout, native subtitles can remain hidden, and playback can remain paused. Recover with **Subtitles → Show Subtitles**, **Subtitles → Show Secondary Subtitles** if needed, and **Playback → Resume** if paused. A request may still be billable after raw disable.
+A request sends the selected phrase, its complete cue, up to three earlier and three later source cues, optional secondary subtitle context, and chat turns directly to the configured endpoint. It does not send the video or complete subtitle file. API keys are stored through IINA's macOS Keychain integration, not in plugin preferences. There is no project-operated server, account, telemetry, or automatic retry. The plugin makes no provider request until a nonempty selection is completed or a follow-up or manual retry is sent.
 
-## Network and limits
+The bundled Swift helper performs real incremental HTTPS streaming. It needs IINA's **video-overlay** and **file-system** permissions; the latter permits the helper to make network requests outside IINA's own HTTP domain checks. It accepts HTTP only for explicit loopback test endpoints. System TLS validation and same-origin redirect restrictions apply. The helper has first-byte, idle, and total request timeouts of 20, 30, and 120 seconds. Cancellation invalidates late UI results, but it cannot guarantee that a provider stops work or billing immediately.
 
-The plugin uses a packaged, per-request Swift executable with `URLSession` for real SSE streaming. Its private request and control FIFOs carry the key and Stop command; IINA's process-launch arguments contain only a private directory path. The executable needs IINA's `file-system` permission and sends network requests outside IINA's `http` allowed-domain checks. It accepts HTTPS or loopback HTTP, follows only same-origin 307/308 redirects, uses system TLS validation, and has first-byte/idle/total timeouts of 20/30/120 seconds. Stop and Disable Overlay invalidate late UI results and ask the helper to cancel. Raw Preferences disable cannot guarantee immediate cancellation or prevent billing.
+Use **Disable Overlay** in plugin Settings before disabling the plugin. Raw disable in IINA Preferences has no teardown callback in the tested version: a helper can run until its total timeout, subtitles can remain hidden, and playback can remain paused. If needed, recover with **Subtitles → Show Subtitles**, **Subtitles → Show Secondary Subtitles**, and **Playback → Resume**.
 
-Limits: 8 MiB and 50,000 cues per subtitle file; 4,000 characters per cue/selection; 2,000 characters per follow-up; 20 turns; 128 KiB request JSON; 64 KiB answer and SSE event. Exceeding a limit fails visibly. The plugin does not silently drop required neighboring cues or completed turns. No automatic retry or provider switch occurs.
+Each subtitle file is limited to 8 MiB and 50,000 cues; each cue or selection to 4,000 characters; each follow-up to 2,000 characters; chat to 20 turns; request JSON to 128 KiB; and an answer or SSE event to 64 KiB. Limits fail visibly. Full-length user-supplied SRT/VTT files within these limits are valid inputs. Complete commercial subtitle tracks are not included in this repository.
 
-See [the spec](docs/SPEC.md), [implementation plan](IMPLEMENTATION_PLAN.md), [evaluation plan](docs/EVAL_PLAN.md), and [acceptance report](ACCEPTANCE_REPORT.md) for behavior and current verification. `bun test tests/evals.test.ts` checks 12 synthetic request cases and the scoring rules; `bun run evals --template` creates an ignored review worksheet, and `bun run evals .tmp/eval-review.json` gives per-case verdicts after responses are reviewed. `bun tests/live_eval.ts --mock` checks collection through the packaged helper with only a local endpoint. A prior authorized synthetic provider evaluation is documented in the acceptance report. No provider key or complete commercial subtitle track is committed.
+## Development and evidence
 
-## Dependencies and provenance
+`bun run release:check` runs the TypeScript and DOM tests, typechecks, compiles the Swift helper, packages the plugin, checks the archive, and exercises the helper against local controlled endpoints. [The acceptance report](ACCEPTANCE_REPORT.md) distinguishes automated, installed-IINA, and still-outstanding checks. The [specification](docs/SPEC.md) defines behavior; the [evaluation plan](docs/EVAL_PLAN.md) describes the synthetic language cases. No real provider key or user media is committed.
 
-- Runtime: IINA's public plugin APIs (IINA is GPL-3.0), macOS Foundation/URLSession, and markdown-it 15.0.2 (MIT) for local Markdown rendering. markdown-it's bundled dependencies and their license notices are included in the plugin's `licenses/` directory. No IINA source is copied.
-- Development: TypeScript 5.9.3 (Apache-2.0), happy-dom 20.8.3 (MIT), and `@types/bun` 1.3.14 (MIT), plus their pinned lockfile dependencies. Bun runs tests and bundles JavaScript. These tools are not bundled into the plugin archive.
-- Phase 0 references are in ignored `.references/` and were used for research only. No substantial source was copied. The plugin's own source is MIT licensed.
+The source is MIT licensed. The package includes notices for `markdown-it` and its bundled dependencies. The ignored `.references/` clones were used for research; no substantial reference implementation was copied. See [the release checklist](docs/RELEASE.md) before publishing or proposing an IINA community-list entry.

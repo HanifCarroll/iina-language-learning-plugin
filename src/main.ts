@@ -188,7 +188,7 @@ export class Session {
     const { menu } = this.host.raw;
     const epoch = this.mediaEpoch;
     menu.removeAllItems();
-    menu.addItem(menu.item('Toggle Language Learning Panel', () => this.togglePanel(), { keyBinding: 'Alt+Meta+g' }));
+    menu.addItem(menu.item('Toggle Neden Panel', () => this.togglePanel(), { keyBinding: 'Alt+Meta+g' }));
     menu.addItem(menu.item('Add SRT/VTT File…', () => { void this.addSubtitleFile(); }, { enabled: !!this.mediaUrl }));
 
     // 3. Add IINA's current tracks under each subtitle role.

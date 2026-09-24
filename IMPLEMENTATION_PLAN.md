@@ -1,4 +1,4 @@
-# IINA Language Learning: implementation plan and evidence
+# Neden: implementation plan and evidence
 
 **Status:** the approved product modules are implemented locally. The installed-IINA milestone remains historical evidence; current product results and outstanding checks are in [ACCEPTANCE_REPORT.md](ACCEPTANCE_REPORT.md). A local Git repository exists; `.references/` and `dist/` are ignored. `docs/SPEC.md` is the behavior source of truth.
 

@@ -82,7 +82,7 @@ test('late install initializes an already loaded player only once', () => {
 test('Plugin menu loads an SRT and selects source and secondary tracks in this window', async () => {
   const player = fakePlayer();
   expect(player.menuItems.map(item => item.title)).toEqual([
-    'Toggle Language Learning Panel', 'Add SRT/VTT File…', 'Source Subtitle', 'Secondary Subtitle'
+    'Toggle Neden Panel', 'Add SRT/VTT File…', 'Source Subtitle', 'Secondary Subtitle'
   ]);
   player.menuItems[1].action?.();
   await Promise.resolve();

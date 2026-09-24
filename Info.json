@@ -1,10 +1,13 @@
 {
-  "name": "IINA Language Learning",
+  "name": "Neden",
+  "description": "Select subtitle phrases for contextual AI explanations and follow-up chat.",
   "identifier": "io.github.hanifcarroll.iina-language-learning",
-  "version": "0.1.8",
+  "version": "0.1.9",
+  "ghRepo": "hanifcarroll/iina-language-learning-plugin",
+  "ghVersion": 1,
   "author": { "name": "Hanif Carroll" },
   "entry": "main.js",
-  "sidebarTab": { "name": "Language Learning" },
+  "sidebarTab": { "name": "Neden" },
   "permissions": ["video-overlay", "file-system"],
   "allowedDomains": [],
   "preferenceDefaults": {
