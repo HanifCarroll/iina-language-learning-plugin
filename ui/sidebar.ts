@@ -5,6 +5,8 @@ declare const iina: Bridge;
 type ViewState = {
   status: string; open: boolean; conversationId: number | null; overlayEnabled: boolean;
   replaying: boolean; replayAvailable: boolean; phrase: string; cue: string;
+  mediaEpoch: number; hasMedia: boolean; sourceId: number | null; secondaryId: number | null;
+  subtitleTracks: Array<{ id: number; title: string; isExternal: boolean }>;
   turns: Array<{ question: string; answer: string; status: string; error?: string }>;
   settings: { endpoint: string; model: string; sourceLanguage: string; explanationLanguage: string;
     includeSecondary: boolean; noKeyRequired: boolean; hasSavedKey: boolean; requestUrl: string;
@@ -22,10 +24,11 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   const element = <T extends HTMLElement>(id: string): T => doc.getElementById(id) as T;
   const question = element<HTMLTextAreaElement>('question');
   let state: ViewState | null = null;
-  let settingsOpen = false;
+  let view: 'chat' | 'subtitles' | 'ai' = 'chat';
   let appearanceDraftActive = false;
   let renderedConversationId: number | null = null;
   let renderedAnswers: string[] = [];
+  let renderedTrackOptions = '';
 
   function resizeQuestion(): void {
     const turns = element('turns');
@@ -35,16 +38,60 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     if (atBottom) turns.scrollTop = turns.scrollHeight;
   }
 
+  function renderTrackChoices(): void {
+    if (!state) return;
+    const tracks = state.subtitleTracks ?? [];
+    const signature = JSON.stringify(tracks);
+    if (signature !== renderedTrackOptions) {
+      for (const id of ['sourceTrack', 'secondaryTrack']) {
+        const select = element<HTMLSelectElement>(id);
+        const off = doc.createElement('option');
+        off.value = '0';
+        off.textContent = 'Off';
+        select.replaceChildren(off);
+        for (const track of tracks) {
+          const option = doc.createElement('option');
+          option.value = String(track.id);
+          option.textContent = track.isExternal ? track.title : `${track.title} (IINA only)`;
+          select.append(option);
+        }
+      }
+      renderedTrackOptions = signature;
+    }
+    element<HTMLSelectElement>('sourceTrack').value = String(state.sourceId ?? 0);
+    element<HTMLSelectElement>('secondaryTrack').value = String(state.secondaryId ?? 0);
+    element<HTMLSelectElement>('sourceTrack').disabled = !state.hasMedia;
+    element<HTMLSelectElement>('secondaryTrack').disabled = !state.hasMedia;
+    element<HTMLButtonElement>('addSubtitleFile').disabled = !state.hasMedia;
+  }
+
+  function setView(next: typeof view): void {
+    if (view === next) return;
+    view = next;
+    appearanceDraftActive = false;
+    bridge.postMessage('settingsView', { open: next !== 'chat', view: next });
+    render();
+    appearanceDraftActive = next === 'subtitles';
+  }
+
   function render(): void {
     if (!state) return;
     const busy = state.turns.at(-1)?.status === 'streaming';
     const status = element('status');
     status.textContent = state.status;
-    status.hidden = state.open && ['Complete', 'Generating…', 'Preparing explanation…'].includes(state.status);
+    const routineStatus = ['Complete', 'Generating…', 'Preparing explanation…'];
+    status.hidden = routineStatus.includes(state.status) ||
+      (view !== 'chat' && state.status === 'Select a subtitle phrase to begin.');
     element('disableOverlay').textContent = state.overlayEnabled ? 'Disable Overlay' : 'Enable Overlay';
-    element('settingsToggle').hidden = settingsOpen;
-    element('conversation').hidden = !state.open || settingsOpen;
-    element('settings').hidden = !settingsOpen;
+    for (const [tab, name] of [['chatTab', 'chat'], ['subtitlesTab', 'subtitles'], ['aiTab', 'ai']] as const) {
+      if (view === name) element(tab).setAttribute('aria-current', 'page');
+      else element(tab).removeAttribute('aria-current');
+    }
+    element('chatView').hidden = view !== 'chat';
+    element('subtitlesView').hidden = view !== 'subtitles';
+    element('aiView').hidden = view !== 'ai';
+    element('conversation').hidden = !state.open;
+    renderTrackChoices();
     const conversationChanged = renderedConversationId !== state.conversationId;
     if (conversationChanged) {
       renderedConversationId = state.conversationId;
@@ -95,7 +142,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     element<HTMLButtonElement>('send').disabled = !!busy;
     element('stop').hidden = !busy;
     element('retry').hidden = !['failed', 'incomplete'].includes(state.turns.at(-1)?.status ?? '');
-    if (!settingsOpen) return;
+    if (view === 'chat') return;
     for (const key of ['endpoint', 'model', 'sourceLanguage', 'explanationLanguage'] as const) {
       const input = element<HTMLInputElement>(key);
       if (doc.activeElement !== input) input.value = state.settings[key];
@@ -132,19 +179,15 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     };
   }
 
-  element('settingsToggle').addEventListener('click', () => {
-    settingsOpen = true;
-    appearanceDraftActive = false;
-    render();
-    appearanceDraftActive = true;
-    bridge.postMessage('settingsView', { open: true });
-  });
-  element('back').addEventListener('click', () => {
-    settingsOpen = false;
-    appearanceDraftActive = false;
-    bridge.postMessage('settingsView', { open: false });
-    render();
-  });
+  element('chatTab').addEventListener('click', () => setView('chat'));
+  element('subtitlesTab').addEventListener('click', () => setView('subtitles'));
+  element('aiTab').addEventListener('click', () => setView('ai'));
+  element('addSubtitleFile').addEventListener('click', () => bridge.postMessage('addSubtitleFile', {}));
+  for (const [id, role] of [['sourceTrack', 'source'], ['secondaryTrack', 'secondary']] as const) {
+    element<HTMLSelectElement>(id).addEventListener('change', () => bridge.postMessage('selectSubtitleTrack', {
+      role, id: Number(element<HTMLSelectElement>(id).value), epoch: state?.mediaEpoch
+    }));
+  }
   element('send').addEventListener('click', sendQuestion);
   element('stop').addEventListener('click', () => bridge.postMessage('stop', {}));
   element('retry').addEventListener('click', () => bridge.postMessage('retry', {}));
@@ -183,11 +226,11 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       render();
     } catch { /* discard malformed host message */ }
   });
-  bridge.onMessage('showConversation', () => { settingsOpen = false; appearanceDraftActive = false; render(); });
+  bridge.onMessage('showConversation', () => { view = 'chat'; appearanceDraftActive = false; render(); });
   bridge.onMessage('appearancePreviewEnded', () => {
     appearanceDraftActive = false;
     render();
-    appearanceDraftActive = settingsOpen;
+    appearanceDraftActive = view === 'subtitles';
   });
   doc.addEventListener('visibilitychange', () => bridge.postMessage('visibility', { hidden: doc.hidden }));
   bridge.postMessage('sidebarReady', {});

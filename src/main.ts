@@ -94,6 +94,7 @@ export class Session {
   private translationText = '';
   private timer: ReturnType<typeof setInterval> | null = null;
   private subtitleMenuState = '';
+  private subtitleTrackState = '';
   private listeners: Array<{ name: string; id: string }> = [];
   private closed = false;
 
@@ -160,9 +161,13 @@ export class Session {
     sidebar.onMessage('saveSettings', value => this.saveSettings(value));
     sidebar.onMessage('saveAppearance', value => this.saveAppearance(value));
     sidebar.onMessage('previewAppearance', value => this.previewAppearance(value));
+    sidebar.onMessage('addSubtitleFile', () => { void this.addSubtitleFile(); });
+    sidebar.onMessage('selectSubtitleTrack', value => this.selectSubtitleTrack(value));
     sidebar.onMessage('settingsView', value => {
-      this.settingsOpen = (value as { open?: unknown })?.open === true;
-      if (!this.settingsOpen) this.discardAppearancePreview();
+      const data = value as { open?: unknown; view?: unknown } | null;
+      this.settingsOpen = data?.view === 'subtitles' || data?.view === 'ai' ||
+        (data?.view === undefined && data?.open === true);
+      if (!this.settingsOpen || data?.view === 'ai') this.discardAppearancePreview();
     });
     sidebar.onMessage('visibility', value => {
       const hidden = (value as { hidden?: unknown })?.hidden;
@@ -207,8 +212,8 @@ export class Session {
 
     // 3. Add IINA's current tracks under each subtitle role.
     for (const [name, selectedId, select] of [
-      ['Source Subtitle', sourceId, (id: number) => { if (epoch === this.mediaEpoch) this.host.selectSource(id); }],
-      ['Secondary Subtitle', secondaryId, (id: number) => { if (epoch === this.mediaEpoch) this.host.selectSecondary(id); }]
+      ['Source Subtitle', sourceId, (id: number) => this.selectSubtitleTrack({ role: 'source', id, epoch })],
+      ['Secondary Subtitle', secondaryId, (id: number) => this.selectSubtitleTrack({ role: 'secondary', id, epoch })]
     ] as const) {
       const group = menu.item(name, null);
       group.addSubMenuItem(menu.item('Off', () => select(0), { selected: selectedId === null || selectedId === 0 }));
@@ -220,6 +225,20 @@ export class Session {
     }
 
     this.subtitleMenuState = signature;
+  }
+
+  private selectSubtitleTrack(value: unknown): void {
+    if (!value || typeof value !== 'object') return;
+    const { role, id, epoch } = value as { role?: unknown; id?: unknown; epoch?: unknown };
+    if ((role !== 'source' && role !== 'secondary') || !Number.isInteger(id) ||
+      epoch !== this.mediaEpoch || !this.mediaUrl || this.mediaUrl !== this.host.mediaUrl) return;
+    if (id !== 0 && !this.host.subtitleTracks.some(track => track.id === id)) return;
+
+    if (role === 'source') this.host.selectSource(id as number);
+    else this.host.selectSecondary(id as number);
+    this.syncTracks();
+    this.updateCue(true);
+    this.render();
   }
 
   private async addSubtitleFile(): Promise<void> {
@@ -235,7 +254,9 @@ export class Session {
       if (!/\.(srt|vtt)$/i.test(path)) throw new Error('Choose an SRT or VTT subtitle file');
 
       this.host.loadSubtitleFile(path);
-      this.status = 'Subtitle file submitted to IINA. Choose its role from the Plugin menu.';
+      this.status = 'Subtitle file added. Choose its role under Subtitle tracks.';
+      this.syncTracks();
+      this.updateCue(true);
     } catch (error) {
       this.status = error instanceof Error ? error.message : 'Could not load subtitle file';
     }
@@ -263,6 +284,7 @@ export class Session {
     this.host.restoreSecondary();
     this.sourceId = null;
     this.secondaryId = null;
+    this.subtitleTrackState = '';
     this.source = null;
     this.secondary = [];
     this.cueIdentity = '';
@@ -276,8 +298,14 @@ export class Session {
   }
 
   private syncTracks(): void {
-    if (!this.overlayEnabled || !this.mediaUrl || this.ended) return;
-    let changed = false;
+    const signature = JSON.stringify([this.host.sourceId, this.host.secondaryId,
+      this.host.subtitleTracks.map(track => [track.id, track.formattedTitle, track.title, track.isExternal])]);
+    let changed = signature !== this.subtitleTrackState;
+    this.subtitleTrackState = signature;
+    if (!this.overlayEnabled || !this.mediaUrl || this.ended) {
+      if (changed) this.render();
+      return;
+    }
     const sourceId = this.host.sourceId;
     if (sourceId !== this.sourceId) {
       changed = true;
@@ -668,6 +696,10 @@ export class Session {
       replayAvailable: !!conversation && conversation.context.selection.mediaEpoch === this.mediaEpoch &&
         conversation.context.selection.sourceTrackId === this.host.sourceId &&
         this.mediaUrl === this.host.mediaUrl && this.host.playable,
+      mediaEpoch: this.mediaEpoch, hasMedia: !!this.mediaUrl,
+      sourceId: this.host.sourceId, secondaryId: this.host.secondaryId,
+      subtitleTracks: this.host.subtitleTracks.map(track => ({ id: track.id,
+        title: track.formattedTitle || track.title || `Track ${track.id}`, isExternal: track.isExternal })),
       phrase: conversation?.context.selection.exactText ?? '',
       cue: conversation?.context.selection.cueText ?? '',
       turns: conversation?.turns ?? [],

@@ -112,6 +112,36 @@ test('Plugin menu loads an SRT and selects source and secondary tracks in this w
   player.close();
 });
 
+test('sidebar track controls share IINA state with the menu and reject stale or forged choices', async () => {
+  const player = fakePlayer();
+  const other = fakePlayer();
+  const epoch = player.states.at(-1).mediaEpoch;
+  expect(player.states.at(-1).subtitleTracks.map((track: { id: number }) => track.id)).toEqual([1, 2]);
+  expect(player.states.at(-1).sourceId).toBe(1);
+  expect(player.states.at(-1).secondaryId).toBe(2);
+
+  player.sidebar.get('selectSubtitleTrack')!({ role: 'source', id: 2, epoch });
+  expect(player.raw.core.subtitle.id).toBe(2);
+  expect(player.states.at(-1).sourceId).toBe(2);
+  expect(other.raw.core.subtitle.id).toBe(1);
+  player.events.get('iina.menu-update')!();
+  expect(player.menuItems.find(item => item.title === 'Source Subtitle')!.items[2].options?.selected).toBe(true);
+
+  player.sidebar.get('selectSubtitleTrack')!({ role: 'secondary', id: 999, epoch });
+  player.sidebar.get('selectSubtitleTrack')!({ role: 'primary', id: 1, epoch });
+  expect(player.raw.core.subtitle.secondID).toBe(2);
+  player.sidebar.get('addSubtitleFile')!({});
+  await Promise.resolve();
+  expect(player.states.at(-1).subtitleTracks.map((track: { id: number }) => track.id)).toEqual([1, 2, 3]);
+
+  player.raw.core.subtitle.id = 1;
+  player.status.url = 'file:///replacement.mp4';
+  player.events.get('mpv.file-loaded')!();
+  player.sidebar.get('selectSubtitleTrack')!({ role: 'source', id: 2, epoch });
+  expect(player.raw.core.subtitle.id).toBe(1);
+  player.close(); other.close();
+});
+
 test('a file picked for an earlier movie is not loaded into replacement media', async () => {
   const player = fakePlayer();
   const oldSourceAction = player.menuItems.find(item => item.title === 'Source Subtitle')!.items[0].action!;

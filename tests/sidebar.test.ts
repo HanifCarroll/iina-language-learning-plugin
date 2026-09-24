@@ -23,7 +23,7 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
   })));
   expect(window.document.querySelectorAll('img,script')).toHaveLength(1); // packaged script element only
   expect(window.document.querySelector('#turns')!.textContent).toContain('<img src="https://evil.example/x">');
-  (window.document.querySelector('#settingsToggle') as unknown as HTMLButtonElement).click();
+  (window.document.querySelector('#aiTab') as unknown as HTMLButtonElement).click();
   const key = window.document.querySelector('#apiKey') as unknown as HTMLInputElement;
   key.value = 'new-fixture-value';
   (window.document.querySelector('#saveSettings') as unknown as HTMLButtonElement).click();
@@ -61,7 +61,8 @@ test('appearance inputs preview without saving, Back discards the draft, and Rep
   state(true);
   expect(replay.textContent).toBe('Stop replay');
 
-  (window.document.querySelector('#settingsToggle') as unknown as HTMLButtonElement).click();
+  (window.document.querySelector('#subtitlesTab') as unknown as HTMLButtonElement).click();
+  (window.document.querySelector('#appearanceControls') as unknown as HTMLDetailsElement).open = true;
   const size = window.document.querySelector('#sourceSize') as unknown as HTMLInputElement;
   size.value = '34';
   size.dispatchEvent(new window.Event('input') as unknown as Event);
@@ -69,10 +70,62 @@ test('appearance inputs preview without saving, Back discards the draft, and Rep
   expect(sent.some(item => item.name === 'saveAppearance')).toBe(false);
   state();
   expect(size.value).toBe('34');
-  (window.document.querySelector('#back') as unknown as HTMLButtonElement).click();
-  expect(sent.at(-1)).toEqual({ name: 'settingsView', data: { open: false } });
-  (window.document.querySelector('#settingsToggle') as unknown as HTMLButtonElement).click();
+  (window.document.querySelector('#chatTab') as unknown as HTMLButtonElement).click();
+  expect(sent.at(-1)).toEqual({ name: 'settingsView', data: { open: false, view: 'chat' } });
+  (window.document.querySelector('#subtitlesTab') as unknown as HTMLButtonElement).click();
   expect(size.value).toBe('28');
+  window.happyDOM.abort();
+});
+
+test('subtitle view lists IINA tracks and sends window-bound selections without exposing settings clutter', async () => {
+  const window = new Window();
+  (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;
+  window.document.body.innerHTML = (await Bun.file('ui/sidebar.html').text()).split('<body>')[1].split('</body>')[0];
+  const handlers = new Map<string, (data: string) => void>();
+  const sent: Array<{ name: string; data: unknown }> = [];
+  mountSidebar(window.document as unknown as Document, {
+    onMessage: (name, callback) => { handlers.set(name, callback); },
+    postMessage: (name, data) => sent.push({ name, data })
+  });
+  const tracks = [
+    { id: 1, title: 'Turkish', isExternal: true },
+    { id: 2, title: 'English', isExternal: true },
+    { id: 3, title: '<img src=x>', isExternal: false }
+  ];
+  const state = (sourceId: number, hasMedia = true) => handlers.get('state')!(encodeURIComponent(JSON.stringify({
+    status: 'Select a subtitle phrase to begin.', open: false, conversationId: null, overlayEnabled: true,
+    replaying: false, replayAvailable: false, phrase: '', cue: '', turns: [],
+    mediaEpoch: 7, hasMedia, sourceId, secondaryId: 2, subtitleTracks: tracks,
+    settings: { endpoint: '', model: '', sourceLanguage: 'Turkish', explanationLanguage: 'English',
+      includeSecondary: true, noKeyRequired: false, hasSavedKey: false, requestUrl: '',
+      appearance: { showTranslation: false, sourceSize: 28, sourceColor: '#ffffff', sourceBottom: 8,
+        translationSize: 25, translationColor: '#ffffff', translationGap: 12 } }
+  })));
+
+  state(1);
+  (window.document.querySelector('#subtitlesTab') as unknown as HTMLButtonElement).click();
+  const source = window.document.querySelector('#sourceTrack') as unknown as HTMLSelectElement;
+  const secondary = window.document.querySelector('#secondaryTrack') as unknown as HTMLSelectElement;
+  expect(source.value).toBe('1');
+  expect(secondary.value).toBe('2');
+  expect(source.options).toHaveLength(4);
+  expect(window.document.getElementsByTagName('img')).toHaveLength(0);
+  expect(source.options[3].textContent).toContain('(IINA only)');
+  expect(window.document.querySelector('#appearanceControls')?.hasAttribute('open')).toBe(false);
+  expect(window.document.querySelector('#aiView')?.hasAttribute('hidden')).toBe(true);
+
+  source.value = '3';
+  source.dispatchEvent(new window.Event('change') as unknown as Event);
+  expect(sent.at(-1)).toEqual({ name: 'selectSubtitleTrack', data: { role: 'source', id: 3, epoch: 7 } });
+  state(3);
+  expect(source.value).toBe('3');
+  (window.document.querySelector('#addSubtitleFile') as unknown as HTMLButtonElement).click();
+  expect(sent.at(-1)).toEqual({ name: 'addSubtitleFile', data: {} });
+
+  state(3, false);
+  expect(source.disabled).toBe(true);
+  expect(secondary.disabled).toBe(true);
+  expect((window.document.querySelector('#addSubtitleFile') as unknown as HTMLButtonElement).disabled).toBe(true);
   window.happyDOM.abort();
 });
 

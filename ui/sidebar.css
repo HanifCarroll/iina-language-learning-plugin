@@ -4,9 +4,13 @@ body{background:#171b21;color:#f3f5f7;font:14px/1.5 -apple-system,BlinkMacSystem
 main{height:100vh;height:100dvh;min-height:0;display:flex;flex-direction:column;padding:16px 18px 0}
 header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none}
 h1{font-size:18px;letter-spacing:-.02em;margin:0}
-h2{font-size:16px}
+h2{font-size:16px;margin:18px 0 12px}
 p{overflow-wrap:anywhere}
-#status{color:#c9d2dc;margin:10px 0;flex:none}
+nav{display:flex;gap:4px;border-bottom:1px solid #354251;margin:10px -18px 0;padding:0 12px;flex:none}
+nav button{flex:1;min-width:0;background:transparent;border:0;border-bottom:2px solid transparent;border-radius:0;color:#acbbc9;padding:9px 4px}
+nav button[aria-current=page]{color:#f3f5f7;border-bottom-color:#8bc5ff;font-weight:700}
+#status{color:#c9d2dc;margin:10px 0;flex:none;font-size:13px}
+#chatView{display:flex;flex:1;flex-direction:column;min-height:0}
 #conversation{display:flex;flex:1;flex-direction:column;min-height:0}
 .source{flex:none;background:#232c36;border:1px solid #3b4a59;border-radius:10px;padding:11px 13px;margin:8px 0 0}
 .eyebrow{display:block;color:#a8bacb;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px}
@@ -41,17 +45,23 @@ details p{margin:7px 0 0;white-space:pre-wrap;font-size:13px;color:#e0e7ed}
 button,input,textarea{font:inherit}
 button{background:#2c435a;border:1px solid #617c95;border-radius:7px;color:#f8fafc;padding:7px 11px;min-height:36px;cursor:pointer}
 button:hover{background:#3b5b78}
-button:focus-visible,summary:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #8bc5ff;outline-offset:2px}
+button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #8bc5ff;outline-offset:2px}
 button:disabled{opacity:.5;cursor:default}
 #send{background:#37648a;border-color:#598fbb;font-weight:600}
 #close{margin-left:auto;background:transparent;border-color:#516170}
 .row{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
 label{display:block;margin:12px 0 4px}
-input:not([type=checkbox]),textarea{display:block;width:100%;padding:8px 10px;background:#232c36;border:1px solid #607183;border-radius:6px;color:#fff}
+input:not([type=checkbox]),select,textarea{display:block;width:100%;padding:8px 10px;background:#232c36;border:1px solid #607183;border-radius:6px;color:#fff}
+input[type=color]{height:40px;padding:4px}
 textarea{line-height:20px;resize:none;overflow-y:auto;min-height:38px;max-height:68px}
 textarea::placeholder{color:#a1aebb}
 .checkbox{display:flex;gap:8px;align-items:center}
-.notice{font-size:12px;color:#c7d0da}
-#settings{overflow-y:auto;min-height:0;padding-bottom:20px}
-#settings button{margin:7px 5px 0 0}
+.notice,.hint{font-size:12px;color:#b9c9d8}
+.hint{margin:6px 0 12px}
+#subtitlesView,#aiView{flex:1;min-height:0;overflow-y:auto;padding-bottom:22px}
+#subtitlesView>h2,#aiView>h2{margin-top:16px}
+#addSubtitleFile{margin:14px 0 5px}
+#appearanceControls,.advanced{border-top:1px solid #354251;margin-top:18px;padding-top:12px}
+#appearanceControls>summary,.advanced>summary{font-size:14px;font-weight:600;color:#edf1f5}
+#appearanceControls>button,#aiView>button{margin-top:12px}
 [hidden]{display:none!important}
