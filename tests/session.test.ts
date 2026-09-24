@@ -219,11 +219,11 @@ test('media replacement rejects old stream results and never resumes the new med
 test('settings dismissal does not resume, while native dismissal preserves chat and resumes', () => {
   const player = fakePlayer();
   select(player);
-  player.sidebar.get('settingsView')!({ open: true });
+  player.sidebar.get('settingsView')!({ open: true, view: 'ai' });
   player.sidebar.get('visibility')!({ hidden: true });
   expect(player.states.at(-1).open).toBe(true);
   expect(player.actions).not.toContain('resume');
-  player.sidebar.get('settingsView')!({ open: false });
+  player.sidebar.get('settingsView')!({ open: false, view: 'chat' });
   player.sidebar.get('visibility')!({ hidden: true });
   expect(player.states.at(-1).open).toBe(true);
   expect(player.states.at(-1).phrase).toBe('öyle');
@@ -288,7 +288,7 @@ test('stacked secondary subtitle restores native state on disable and tracks app
   player.close();
 });
 
-test('appearance changes preview without saving and Back restores the owned native subtitle state', () => {
+test('appearance changes preview without saving and leaving Subtitles restores native state', () => {
   const player = fakePlayer();
   const saved: unknown[] = [];
   player.raw.preferences.set = (_name, value) => { saved.push(value); };
@@ -296,17 +296,17 @@ test('appearance changes preview without saving and Back restores the owned nati
   const draft = { showTranslation: true, sourceSize: 34, sourceColor: '#ffcc00', sourceBottom: 14,
     translationSize: 26, translationColor: '#eeeeee', translationGap: 20 };
 
-  player.sidebar.get('settingsView')!({ open: true });
+  player.sidebar.get('settingsView')!({ open: true, view: 'subtitles' });
   player.sidebar.get('previewAppearance')!(draft);
   expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toEqual(draft);
   expect(player.props.get('secondary-sub-visibility')).toBe(false);
   expect(player.states.at(-1).settings.appearance.sourceSize).toBe(28);
   expect(saved).toHaveLength(0);
 
-  player.sidebar.get('settingsView')!({ open: false });
+  player.sidebar.get('settingsView')!({ open: false, view: 'chat' });
   expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toMatchObject({ sourceSize: 28 });
   expect(player.props.get('secondary-sub-visibility')).toBe(true);
-  player.sidebar.get('settingsView')!({ open: true });
+  player.sidebar.get('settingsView')!({ open: true, view: 'subtitles' });
   player.sidebar.get('previewAppearance')!(draft);
   player.sidebar.get('saveAppearance')!(draft);
   expect(saved).toHaveLength(1);
@@ -321,7 +321,7 @@ test('appearance changes preview without saving and Back restores the owned nati
 test('native Settings dismissal discards unsaved subtitle preview without resuming playback', () => {
   const player = fakePlayer();
   select(player);
-  player.sidebar.get('settingsView')!({ open: true });
+  player.sidebar.get('settingsView')!({ open: true, view: 'subtitles' });
   player.sidebar.get('previewAppearance')!({ showTranslation: true, sourceSize: 34, sourceColor: '#ffcc00',
     sourceBottom: 14, translationSize: 26, translationColor: '#eeeeee', translationGap: 20 });
   player.sidebar.get('visibility')!({ hidden: true });
@@ -331,17 +331,17 @@ test('native Settings dismissal discards unsaved subtitle preview without resumi
   player.close();
 });
 
-test('failed appearance save keeps the stored appearance and Back removes its preview', () => {
+test('failed appearance save keeps the stored appearance and leaving Subtitles removes its preview', () => {
   const player = fakePlayer();
   const draft = { showTranslation: true, sourceSize: 34, sourceColor: '#ffcc00', sourceBottom: 14,
     translationSize: 26, translationColor: '#eeeeee', translationGap: 20 };
   player.raw.preferences.set = () => { throw new Error('Storage unavailable'); };
-  player.sidebar.get('settingsView')!({ open: true });
+  player.sidebar.get('settingsView')!({ open: true, view: 'subtitles' });
   player.sidebar.get('previewAppearance')!(draft);
   player.sidebar.get('saveAppearance')!(draft);
   expect(player.states.at(-1).status).toBe('Storage unavailable');
   expect(player.states.at(-1).settings.appearance.sourceSize).toBe(28);
-  player.sidebar.get('settingsView')!({ open: false });
+  player.sidebar.get('settingsView')!({ open: false, view: 'chat' });
   expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toMatchObject({ sourceSize: 28 });
   player.close();
 });
@@ -350,7 +350,7 @@ test('saving provider settings does not accidentally commit an appearance previe
   const player = fakePlayer();
   const saved: any[] = [];
   player.raw.preferences.set = (_name, value) => { saved.push(value); };
-  player.sidebar.get('settingsView')!({ open: true });
+  player.sidebar.get('settingsView')!({ open: true, view: 'subtitles' });
   player.sidebar.get('previewAppearance')!({ showTranslation: true, sourceSize: 34, sourceColor: '#ffcc00',
     sourceBottom: 14, translationSize: 26, translationColor: '#eeeeee', translationGap: 20 });
   player.sidebar.get('saveSettings')!({ endpoint: 'http://127.0.0.1:47891', model: 'synthetic',
@@ -358,7 +358,7 @@ test('saving provider settings does not accidentally commit an appearance previe
     noKeyRequired: true, appearance: { showTranslation: true, sourceSize: 34 } });
   expect(saved.at(-1).appearance.sourceSize).toBe(28);
   expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toMatchObject({ sourceSize: 34 });
-  player.sidebar.get('settingsView')!({ open: false });
+  player.sidebar.get('settingsView')!({ open: true, view: 'ai' });
   expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toMatchObject({ sourceSize: 28 });
   player.close();
 });

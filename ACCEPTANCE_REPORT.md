@@ -1,10 +1,16 @@
 # Product acceptance evidence
 
-**Status (2026-09-24):** the approved MVP and version 0.1.8 subtitle-menu changes have been tested locally. The **Neden** 0.1.9 candidate now includes appearance preview and one-shot cue replay. This is not a release or a claim that all A01–A26 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](docs/history/INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
+**Status (2026-09-24):** the approved MVP and version 0.1.8 subtitle-menu changes have been tested locally. The **Neden** 0.1.9 candidate now includes appearance preview, one-shot cue replay, and a reorganized sidebar with track controls. This is not a release or a claim that all A01–A26 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](docs/history/INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
+
+## Sidebar organization and subtitle controls (version 0.1.9 candidate)
+
+The sidebar now has Chat, Subtitles, and AI settings views. Subtitles lists IINA's current source and secondary tracks and can open an SRT/VTT file picker. Both selectors use the existing player-specific selection path used by the Plugin menu. The sidebar rejects an unknown track or a selection sent for a previous movie. Appearance and Overlay control are collapsed beneath the track controls; switching away from Subtitles discards an unsaved appearance preview. Chat keeps its composer and message list when another view is opened.
+
+`bun run release:check` passed **64/64** Bun tests with 413 assertions, TypeScript checking, Swift compilation, package integrity, and **10/10** controlled helper tests in the main checkout. DOM and session tests cover track-list rendering, safe track titles, per-window selection, stale/forged choices, file addition, and view switching. The updated sidebar has **not** been installed or visually checked in IINA; track selection, file picker, appearance, chat layout, and native dismissal in this candidate remain native checks.
 
 ## Appearance preview and cue replay (version 0.1.9)
 
-Appearance changes now preview in the overlay without writing preferences. Apply saves them; Back or native Settings dismissal restores the saved appearance and any native secondary visibility temporarily owned by the preview. Saving provider settings does not commit an appearance draft. The sidebar keeps draft inputs stable when streamed chat state updates.
+Appearance changes now preview in the overlay without writing preferences. Apply saves them; leaving Subtitles or native sidebar dismissal restores the saved appearance and any native secondary visibility temporarily owned by the preview. Saving AI settings does not commit an appearance draft. The sidebar keeps draft inputs stable when streamed chat state updates.
 
 Replay line uses the captured source cue and current subtitle delay/speed, plays it once, and returns to the previous position and pause state without sending an AI request. Stop replay and Hide/Resume return early. User seeks, source-track or media changes, and a different player window do not receive a return seek. The implementation distinguishes the initial programmatic seek from a user seek using the observed position and a short time window; native event ordering still needs checking in installed IINA.
 
@@ -138,7 +144,7 @@ For 0.1.3, `bun test` passed 29 tests with 144 assertions, and `bun run build` p
 | A22 | **Partial.** Removing the action row prevents the selection button from shifting subtitle layout; exact before/after native pixel alignment remains unchecked. Installed 0.1.7 selected a word and ⌥⌘G toggled the panel. Earlier harness tested wrapped drag, pointer pass-through, dual display, fullscreen Back, and separate windows; 0.1.4 kept the composer pinned and scrolling. Product keyboard selection, app-focus dismissal, resize/display-scale, and stacked-line visual placement remain. |
 | A23 | **Automated pass, native partial.** Media change and teardown clear in-memory conversation and request ownership; only non-secret preferences and Keychain status persist. Installed archive loaded after restart. A final-product native chat-then-restart check remains. |
 | A24 | **Automated pass, native partial.** Parsers, request/body, cue, question, turn, answer, and SSE limits fail visibly; required context is not silently dropped. Native oversize-file and maximum-history UI checks remain. |
-| A25 | **Automated pass, native pending.** Session and DOM tests verify unsaved preview, Apply, Back, native dismissal, provider-save isolation, and native secondary visibility restoration. Installed-IINA visual and dismissal checks remain. |
+| A25 | **Automated pass, native pending.** Session and DOM tests verify unsaved preview, Apply, leaving Subtitles, native dismissal, AI-settings save isolation, and native secondary visibility restoration. Installed-IINA visual and dismissal checks remain. |
 | A26 | **Automated pass, native pending.** Session tests verify cue playback, return state, Stop replay, user seek, source-track/media change, second-window isolation, and subtitle delay/speed. Installed-IINA event ordering, actual playback, and fullscreen/sidebar interaction remain. |
 
 ## Current limits and recovery

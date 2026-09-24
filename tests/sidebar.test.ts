@@ -34,7 +34,7 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
   window.happyDOM.abort();
 });
 
-test('appearance inputs preview without saving, Back discards the draft, and Replay line toggles', async () => {
+test('appearance inputs preview without saving, leaving Subtitles discards the draft, and Replay line toggles', async () => {
   const window = new Window();
   (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;
   window.document.body.innerHTML = (await Bun.file('ui/sidebar.html').text()).split('<body>')[1].split('</body>')[0];

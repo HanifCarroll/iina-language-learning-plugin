@@ -28,7 +28,7 @@ On the owner's Mac, using a local video and supplied Turkish/English text subtit
 | Conversation dismissal | **Automatically resume playback** when the user hides the active conversation panel; keep its chat available in that player window. |
 | Source context | Complete selected cue plus up to **three preceding and three following source cues**. Context size is fixed for the MVP. |
 | Secondary subtitles | Turkish/source text is selectable. An optional stacked mode shows IINA's selected English/secondary track above it, with separate display controls. It starts off; native secondary rendering is restored when that mode is off. |
-| Track controls | The plugin menu can add an external SRT/VTT file and choose loaded source and secondary tracks. IINA still owns the actual tracks and playback. |
+| Track controls | The sidebar's Subtitles view can add an external SRT/VTT file and choose loaded source and secondary tracks; the plugin menu retains the same controls. IINA still owns the actual tracks and playback. |
 | Secondary text in requests | Include available English/secondary subtitle context by default, with a **configurable on/off setting** independent of subtitle visibility. |
 | Initial explanation | Natural meaning, **literal meaning every time**, breakdown, relevant grammar/morphology, and contextual/idiomatic notes. Keep it brief. |
 | Learner profile | A small built-in beginner-learner brief; no editable profile or system-prompt editor yet. |
@@ -82,7 +82,7 @@ Preserve its overall composition: unobtrusive selectable subtitles over the exis
 
 ### Conversation sidebar
 
-Display the selected phrase, its complete source cue, an optional timestamp, streamed messages, a multiline follow-up composer, Send, Stop while generating, Retry after an eligible error, Replay line, and a clear Hide/Resume control. A settings link may open the plugin's provider/language and subtitle appearance settings.
+Use three focused sidebar views: Chat, Subtitles, and AI settings. Chat displays the selected phrase, its complete source cue, an optional timestamp, streamed messages, a multiline follow-up composer, Send, Stop while generating, Retry after an eligible error, Replay line, and a clear Hide/Resume control. Subtitles contains source and secondary track selection, file loading, appearance, and overlay control. AI settings contains the endpoint, model, languages, and credential controls. Keep the current conversation when changing views.
 
 Use one conversation view, not separate explanation and chat products. Keep the selected phrase identifiable while scrolling. Enter submits; Shift+Enter inserts a newline, respecting text-composition input. Typing spaces in a text input must not inadvertently control playback.
 
@@ -96,13 +96,13 @@ The plugin renders selectable **primary/source** text. Its optional stacked mode
 
 Restore only the native visibility state owned by this window on track/media changes, overlay disable, and teardown. Do not permanently alter the user's IINA subtitle preferences. The installed IINA 1.5.0-beta2 displayed a synthetic secondary cue above Turkish in this mode; further visual and timing checks remain in the acceptance report. [R4]
 
-Appearance edits preview on the video without persisting them. Apply saves the appearance; Back or native settings dismissal restores the saved values and native subtitle visibility. Saving provider settings alone does not save an appearance preview.
+Appearance edits preview on the video without persisting them. Apply saves the appearance; leaving Subtitles or native sidebar dismissal restores the saved values and native subtitle visibility. Saving AI settings alone does not save an appearance preview.
 
 ## 5. Interaction lifecycle
 
 ### Normal flow
 
-1. The user opens a video and adds/selects source and secondary tracks from the plugin menu or IINA's own subtitle controls.
+1. The user opens a video and adds/selects source and secondary tracks in the sidebar's Subtitles view, the plugin menu, or IINA's own subtitle controls.
 2. The plugin shows selectable source text; secondary subtitles remain visible if enabled in IINA.
 3. The user completes a word or phrase selection. Capture an immutable selection/context snapshot, pause playback, and open the sidebar. Validate configuration before transmitting anything.
 4. Send one request to the configured provider and stream its answer into the sidebar.
@@ -313,7 +313,7 @@ Use synthetic fixtures rather than distributing television episodes or complete 
 | A22 | **UI integration:** selecting text does not move the subtitle; window resize, fullscreen selection, ordinary IINA controls, ⌥⌘G panel toggle, sidebar/composer focus and native dismissal, and Turkish characters remain usable. |
 | A23 | **Session lifecycle:** latest conversation is memory-only; a new media session/restart has no previous chat. Non-secret settings and the saved Keychain credential persist as intended. |
 | A24 | **Boundaries:** oversized input/history produces a documented visible limit; no silent context corruption, hidden summarization request, or automatic stronger-model escalation. |
-| A25 | **Appearance preview:** editing size, color, placement, or stacked mode previews immediately without saving. Apply persists; Back and native settings dismissal restore saved values and owned native secondary visibility. Saving provider settings alone does not commit the preview. |
+| A25 | **Appearance preview:** editing size, color, placement, or stacked mode previews immediately without saving. Apply persists; leaving Subtitles and native sidebar dismissal restore saved values and owned native secondary visibility. Saving AI settings alone does not commit the preview. |
 | A26 | **Replay line:** the captured cue plays once without an AI request, then playback returns to the prior position and paused/playing state. Stop replay and Hide/Resume restore the prior position; a user seek, source-track change, media replacement, and another window do not receive an unwanted return seek. Verify subtitle delay and speed. |
 
 Automate pure context/conversation/parser/prompt logic and DOM/bridge behavior where practical. Use a local mock streaming endpoint for transport tests. Actual IINA, Keychain, native subtitle coexistence, focus, and fullscreen require real-runtime evidence. Document tests not run and why; mocks are not evidence that native integration works.
