@@ -55,6 +55,8 @@ button:disabled{opacity:.5;cursor:default}
 .composer-actions #send{margin-left:auto}
 label{display:block;margin:14px 0 5px;font-size:13px;font-weight:600}
 input:not([type=checkbox]),select,textarea{display:block;width:100%;padding:8px 10px;background:#232c36;border:1px solid #607183;border-radius:6px;color:#fff}
+select{height:44px;padding:0 12px;line-height:normal}
+select:focus{outline:2px solid #8bc5ff;outline-offset:-3px}
 input[type=color]{height:40px;padding:4px}
 textarea{line-height:20px;resize:none;overflow-y:auto;min-height:38px;max-height:68px}
 textarea::placeholder{color:#a1aebb}

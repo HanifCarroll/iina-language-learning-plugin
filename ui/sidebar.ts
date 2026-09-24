@@ -97,10 +97,13 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     const secondaryId = state.secondaryId;
     const sourceTrack = state.subtitleTracks?.find(track => track.id === sourceId);
     const secondaryTrack = state.subtitleTracks?.find(track => track.id === secondaryId);
-    const top = state.settings.secondaryBelowSource ? sourceTrack : secondaryTrack;
-    const bottom = state.settings.secondaryBelowSource ? secondaryTrack : sourceTrack;
-    element('subtitleOrder').textContent = `Top: ${top?.title ?? '—'} · Bottom: ${bottom?.title ?? '—'}`;
-    element<HTMLButtonElement>('swapSubtitleOrder').disabled = !state.hasMedia || !sourceTrack || !secondaryTrack;
+    const bothTracksSelected = !!sourceTrack && !!secondaryTrack;
+    element('subtitleOrder').textContent = bothTracksSelected
+      ? state.settings.secondaryBelowSource ? 'Source above secondary' : 'Secondary above source'
+      : sourceTrack ? 'Source subtitle only' : secondaryTrack ? 'Select a source subtitle' : 'No subtitles selected';
+    const swap = element<HTMLButtonElement>('swapSubtitleOrder');
+    swap.hidden = !bothTracksSelected;
+    swap.disabled = !state.hasMedia;
     const conversationChanged = renderedConversationId !== state.conversationId;
     if (conversationChanged) {
       renderedConversationId = state.conversationId;
