@@ -1,5 +1,13 @@
 # Product acceptance evidence
 
+## Native playback controls: Top layout workaround (2026-09-24)
+
+Tested on macOS 27.0 / IINA 1.5.0-beta2 with Neden's installed 0.1.12 candidate and the owner's open episode. **PASS, owner-confirmed:** after selecting **Video → Show Video Panel → Layout → Top**, the owner could click the top Play button with Neden active. The accessibility tree showed Neden's overlay and advancing subtitle text. Top remains selected. This is a workaround, not a fix for floating/bottom controls.
+
+Earlier isolation checks failed with Neden's overlay hidden; the owner confirmed Play worked after fully disabling Neden and restarting IINA. Those results supersede any broad claim that overlay click-through guarantees native OSC button access. IINA's full-window overlay container and view ordering are the leading source-supported explanation; the native click recipient was not instrumented.
+
+The automated mouse test was inconclusive: captures intermittently showed overlapping title/control bars or blank frames, and fullscreen coordinate clicks returned `noWindowsAvailable`. Fullscreen was entered and exited, but fullscreen button operation was not verified. Other toolbar buttons, volume, repeated Play/Pause, and other window sizes remain unverified. No AI request was made during this check.
+
 ## Subtitle order control (version 0.1.11 candidate)
 
 The Subtitles view shows the selected top and bottom track names and a **Swap subtitle positions** button. The order is saved independently of appearance previews; the source track remains the selectable one. A later 0.1.11 build also stops capturing overlay clicks when no readable source subtitle track is active or the source text mismatches IINA. `bun run release:check` passed **67/67** Bun tests with **452 assertions**, TypeScript checking, Swift compilation, archive integrity, and **10/10** controlled helper tests. The archive is in ignored `dist/`.
