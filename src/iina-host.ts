@@ -4,7 +4,7 @@ export type SubtitleTrack = { id: number; isExternal: boolean; title: string | n
 export type RawIina = {
   core: {
     status: { url: string; position: number; duration: number; idle: boolean };
-    window: { visible: boolean };
+    window: { loaded: boolean; visible: boolean };
     subtitle: { id: number | null; secondID: number | null; tracks: SubtitleTrack[] };
     pause(): void; resume(): void;
   };

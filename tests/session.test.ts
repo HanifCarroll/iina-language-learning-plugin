@@ -5,7 +5,7 @@ import { IinaHost, type RawIina } from '../src/iina-host';
 const source = '1\n00:00:00,000 --> 00:00:02,000\nBen öyle bir insan mıyım?\n\n2\n00:00:04,000 --> 00:00:06,000\nNext cue';
 const secondary = '1\n00:00:00,000 --> 00:00:03,000\nAm I that kind of person?';
 
-function fakePlayer() {
+function fakePlayer(alreadyLoaded = false) {
   const events = new Map<string, () => void>();
   const overlay = new Map<string, (value: unknown) => void>();
   const sidebar = new Map<string, (value: unknown) => void>();
@@ -20,7 +20,7 @@ function fakePlayer() {
   const settings = { endpoint: 'http://127.0.0.1:47891', model: 'synthetic', sourceLanguage: 'Turkish',
     explanationLanguage: 'English', includeSecondary: true, noKeyRequired: true };
   const raw = {
-    core: { status, window: { visible: true }, subtitle: { id: 1, secondID: 2,
+    core: { status, window: { loaded: alreadyLoaded, visible: true }, subtitle: { id: 1, secondID: 2,
       tracks: [{ id: 1, isExternal: true, title: 'source', codec: 'subrip' },
         { id: 2, isExternal: true, title: 'secondary', codec: 'subrip' }] },
       pause: () => actions.push('pause'), resume: () => actions.push('resume') },
@@ -31,7 +31,7 @@ function fakePlayer() {
       handle: (path: string) => ({ write: (value: string) => writes.push(`${path}:${value}`), close: () => {} }) },
     mpv: { getString: (name: string) => props.get(name) ?? '', getNumber: (name: string) => props.get(name) ?? 0,
       getFlag: (name: string) => props.get(name) ?? false, set: (name: string, value: unknown) => { props.set(name, value); } },
-    overlay: { simpleMode: () => {}, loadFile: () => { overlay.clear(); }, onMessage: (name: string, callback: (value: unknown) => void) => { overlay.set(name, callback); },
+    overlay: { simpleMode: () => actions.push('simple mode'), loadFile: () => { overlay.clear(); }, onMessage: (name: string, callback: (value: unknown) => void) => { overlay.set(name, callback); },
       postMessage: (name: string) => overlayMessages.push(name), show: () => actions.push('overlay show'), hide: () => actions.push('overlay hide'), setClickable: () => {} },
     sidebar: { loadFile: () => { sidebar.clear(); }, onMessage: (name: string, callback: (value: unknown) => void) => { sidebar.set(name, callback); },
       postMessage: (_name: string, encoded: string) => { states.push(JSON.parse(decodeURIComponent(encoded))); },
@@ -45,13 +45,25 @@ function fakePlayer() {
   } as unknown as RawIina;
   const session = new Session(new IinaHost(raw, 'io.github.hanifcarroll.iina-language-learning'));
   session.start();
-  events.get('iina.window-loaded')!();
+  if (!alreadyLoaded) {
+    raw.core.window.loaded = true;
+    events.get('iina.window-loaded')!();
+  }
   events.get('iina.plugin-overlay-loaded')!();
   overlay.get('overlayReady')!({});
   sidebar.get('sidebarReady')!({});
   return { session, raw, status, props, events, overlay, sidebar, frames, writes, states, actions, overlayMessages,
     tick: () => (session as any).tick(), close: () => events.get('iina.window-will-close')?.() };
 }
+
+test('late install initializes an already loaded player only once', () => {
+  const player = fakePlayer(true);
+  expect(player.actions.filter(action => action === 'simple mode')).toHaveLength(1);
+  expect(player.states.at(-1).status).toBe('Select a subtitle phrase to begin.');
+  player.events.get('iina.window-loaded')!();
+  expect(player.actions.filter(action => action === 'simple mode')).toHaveLength(1);
+  player.close();
+});
 
 function select(player: ReturnType<typeof fakePlayer>) {
   const pending = { cue: { trackId: 1, index: 0, text: 'Ben öyle bir insan mıyım?' }, start: 4, end: 8, text: 'öyle' };

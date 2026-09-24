@@ -52,6 +52,7 @@ export class Session {
   private retiring: NativeStream[] = [];
   private resume: { epoch: number; url: string } | null = null;
   private overlayReady = false;
+  private windowInitialized = false;
   private overlayPageRequested = false;
   private sidebarReady = false;
   private settingsOpen = false;
@@ -78,9 +79,13 @@ export class Session {
     on('mpv.seek', () => this.seek());
     on('mpv.end-file', () => { this.ended = true; this.mediaChanged(); });
     on('iina.window-will-close', () => this.teardown());
+    // Installing into an already open player does not replay iina.window-loaded.
+    if (this.host.raw.core.window.loaded === true) this.windowLoaded();
   }
 
   private windowLoaded(): void {
+    if (this.windowInitialized || this.closed) return;
+    this.windowInitialized = true;
     const { overlay, event } = this.host.raw;
     // Installed IINA initializes a hidden overlay after simpleMode loads.
     const name = 'iina.plugin-overlay-loaded';

@@ -1,10 +1,10 @@
 # Product acceptance evidence
 
-**Status (2026-09-23):** the approved MVP is implemented and committed locally, with final documentation checks pending. This is a local implementation report, not a release or a claim that all A01–A24 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
+**Status (2026-09-23):** the approved MVP is implemented and committed locally. This is a local implementation report, not a release or a claim that all A01–A24 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
 
 ## Environment and levels of evidence
 
-- **Installed product:** the final archive made from `dist/io.github.hanifcarroll.iina-language-learning.iinaplugin` was installed through IINA's **Install Local Package** control in a fresh isolated profile at `/tmp/iina-final-install-isolated`. IINA 1.5.0-beta2 build 172 restarted and loaded that installed copy on macOS 27 arm64 with bundled mpv 0.41.0. The permission dialog showed the documented `file-system` and `video-overlay` permissions. The normal IINA profile was not modified.
+- **Installed product:** version 0.1.0 was installed through IINA's **Install Local Package** control in a fresh isolated profile at `/tmp/iina-final-install-isolated`. IINA 1.5.0-beta2 build 172 restarted and loaded that installed copy on macOS 27 arm64 with bundled mpv 0.41.0. The permission dialog showed the documented `file-system` and `video-overlay` permissions. At that point the normal IINA profile was not modified. The later 0.1.1 late-install fix has automated coverage but has not yet had an installed-IINA retest.
 - **Earlier product folder:** the same product architecture was exercised through IINA's development link in `/tmp/iina-product-isolated`. A later code fix changed the Stop status guard and the `event.off(name, id)` teardown call; those fixes passed automated tests, and the final installed archive loaded without the earlier listener warning. Results from that folder are identified separately.
 - **Automated:** Bun runs pure TypeScript and DOM/bridge/session tests. The Python tests execute the final compiled Swift helper against local controlled endpoints. All fixtures and media are synthetic. No real provider key, billable request, or commercial subtitle file was used.
 
@@ -12,7 +12,7 @@
 
 | Check | Result |
 |---|---|
-| `bun test` | 25 passed, 0 failed, 113 assertions across nine files. Covers parser/timing/context, selection drag and seek, DOM safety, conversation ownership, Keychain adapter, stdout queue, session lifecycle, and settings. |
+| `bun test` | 26 passed, 0 failed, 116 assertions across nine files. Covers parser/timing/context, selection drag and seek, DOM safety, conversation ownership, Keychain adapter, stdout queue, session lifecycle, settings, and late installation into an open player. |
 | `bun run build` | Passed actual `tsc --noEmit`, Swift compilation, and three Bun bundles; built one `.iinaplugin` package. |
 | `python3 tests/test_stream_helper.py dist/io.github.hanifcarroll.iina-language-learning.iinaplugin/native/stream-helper` | 9 passed. Real delayed SSE, auth and same-origin redirect, Stop, closed stdout, timeouts, interruption, boundary errors, TLS rejection, and FIFO cleanup. |
 | `/Applications/IINA.app/Contents/MacOS/iina-plugin pack dist/io.github.hanifcarroll.iina-language-learning.iinaplugin` and `unzip -t` | Final `.iinaplgz` archive packed and every member, including `LICENSE` and the Swift executable, passed integrity check. The archive is ignored by Git. |
@@ -50,6 +50,8 @@
 | A24 | **Automated pass, native partial.** Parsers, request/body, cue, question, turn, answer, and SSE limits fail visibly; required context is not silently dropped. Native oversize-file and maximum-history UI checks remain. |
 
 ## Current limits and recovery
+
+IINA installed the plugin into an already open movie window in the normal profile at 21:37, after that window's `iina.window-loaded` event. Version 0.1.0 waited for the missed event and showed an empty sidebar tab. IINA source confirms a newly enabled plugin instance is added to existing players without replaying that event. Fully quitting and reopening IINA is the immediate recovery. Version 0.1.1 checks `core.window.loaded`, initializes that existing window once, and has an automated test for both late install and duplicate event delivery. Native hot-install of 0.1.1 remains unverified.
 
 The tested IINA release has no plugin teardown callback on raw Preferences disable. Use the in-plugin **Disable Overlay** control for safe shutdown. If raw disable hides source text, use **Subtitles → Show Subtitles**; if a conversation left playback paused, use **Playback → Resume**. The helper may continue to its total timeout and an external provider may bill for work already sent. Quit IINA disconnected the tested helper and cleaned its FIFO, but forced host crashes and exact cancellation latency are not guaranteed.
 
