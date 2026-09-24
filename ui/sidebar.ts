@@ -3,7 +3,8 @@ import MarkdownIt from 'markdown-it/browser';
 type Bridge = { onMessage(name: string, callback: (data: string) => void): void; postMessage(name: string, data: unknown): void };
 declare const iina: Bridge;
 type ViewState = {
-  status: string; open: boolean; conversationId: number | null; overlayEnabled: boolean; phrase: string; cue: string;
+  status: string; open: boolean; conversationId: number | null; overlayEnabled: boolean;
+  replaying: boolean; replayAvailable: boolean; phrase: string; cue: string;
   turns: Array<{ question: string; answer: string; status: string; error?: string }>;
   settings: { endpoint: string; model: string; sourceLanguage: string; explanationLanguage: string;
     includeSecondary: boolean; noKeyRequired: boolean; hasSavedKey: boolean; requestUrl: string;
@@ -22,6 +23,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   const question = element<HTMLTextAreaElement>('question');
   let state: ViewState | null = null;
   let settingsOpen = false;
+  let appearanceDraftActive = false;
   let renderedConversationId: number | null = null;
   let renderedAnswers: string[] = [];
 
@@ -53,6 +55,9 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       element<HTMLDetailsElement>('fullCue').open = false;
     }
     if (element('phrase').textContent !== state.phrase) element('phrase').textContent = state.phrase;
+    const replay = element<HTMLButtonElement>('replay');
+    replay.hidden = !state.replayAvailable;
+    replay.textContent = state.replaying ? 'Stop replay' : 'Replay line';
     if (element('sourceCue').textContent !== state.cue) element('sourceCue').textContent = state.cue;
     element('fullCue').hidden = state.phrase.trim() === state.cue.trim();
     const turns = element('turns');
@@ -97,10 +102,11 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     }
     element<HTMLInputElement>('includeSecondary').checked = state.settings.includeSecondary;
     element<HTMLInputElement>('noKeyRequired').checked = state.settings.noKeyRequired;
-    element<HTMLInputElement>('showTranslation').checked = state.settings.appearance.showTranslation;
-    for (const key of ['sourceSize', 'sourceColor', 'sourceBottom', 'translationSize', 'translationColor', 'translationGap'] as const) {
-      const input = element<HTMLInputElement>(key);
-      if (doc.activeElement !== input) input.value = String(state.settings.appearance[key]);
+    if (!appearanceDraftActive) {
+      element<HTMLInputElement>('showTranslation').checked = state.settings.appearance.showTranslation;
+      for (const key of ['sourceSize', 'sourceColor', 'sourceBottom', 'translationSize', 'translationColor', 'translationGap'] as const) {
+        element<HTMLInputElement>(key).value = String(state.settings.appearance[key]);
+      }
     }
     element('keyStatus').textContent = state.settings.hasSavedKey ? 'A key is saved for this endpoint.' : 'No key is saved for this endpoint.';
     element('requestUrl').textContent = state.settings.requestUrl ? `Requests go to ${state.settings.requestUrl}` : '';
@@ -126,14 +132,29 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     };
   }
 
-  element('settingsToggle').addEventListener('click', () => { settingsOpen = true; bridge.postMessage('settingsView', { open: true }); render(); });
-  element('back').addEventListener('click', () => { settingsOpen = false; bridge.postMessage('settingsView', { open: false }); render(); });
+  element('settingsToggle').addEventListener('click', () => {
+    settingsOpen = true;
+    appearanceDraftActive = false;
+    render();
+    appearanceDraftActive = true;
+    bridge.postMessage('settingsView', { open: true });
+  });
+  element('back').addEventListener('click', () => {
+    settingsOpen = false;
+    appearanceDraftActive = false;
+    bridge.postMessage('settingsView', { open: false });
+    render();
+  });
   element('send').addEventListener('click', sendQuestion);
   element('stop').addEventListener('click', () => bridge.postMessage('stop', {}));
   element('retry').addEventListener('click', () => bridge.postMessage('retry', {}));
+  element('replay').addEventListener('click', () => bridge.postMessage('replayCue', {}));
   element('close').addEventListener('click', () => bridge.postMessage('close', {}));
   element('disableOverlay').addEventListener('click', () => bridge.postMessage(state?.overlayEnabled ? 'disableOverlay' : 'enableOverlay', {}));
   element('saveAppearance').addEventListener('click', () => bridge.postMessage('saveAppearance', readAppearance()));
+  for (const key of ['showTranslation', 'sourceSize', 'sourceColor', 'sourceBottom', 'translationSize', 'translationColor', 'translationGap']) {
+    element(key).addEventListener('input', () => bridge.postMessage('previewAppearance', readAppearance()));
+  }
   element('saveSettings').addEventListener('click', () => {
     const keyInput = element<HTMLInputElement>('apiKey');
     const payload = {
@@ -143,7 +164,6 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       explanationLanguage: element<HTMLInputElement>('explanationLanguage').value,
       includeSecondary: element<HTMLInputElement>('includeSecondary').checked,
       noKeyRequired: element<HTMLInputElement>('noKeyRequired').checked,
-      appearance: readAppearance(),
       key: keyInput.value
     };
     keyInput.value = '';
@@ -163,7 +183,12 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       render();
     } catch { /* discard malformed host message */ }
   });
-  bridge.onMessage('showConversation', () => { settingsOpen = false; render(); });
+  bridge.onMessage('showConversation', () => { settingsOpen = false; appearanceDraftActive = false; render(); });
+  bridge.onMessage('appearancePreviewEnded', () => {
+    appearanceDraftActive = false;
+    render();
+    appearanceDraftActive = settingsOpen;
+  });
   doc.addEventListener('visibilitychange', () => bridge.postMessage('visibility', { hidden: doc.hidden }));
   bridge.postMessage('sidebarReady', {});
   bridge.postMessage('visibility', { hidden: doc.hidden });

@@ -1,6 +1,14 @@
 # Product acceptance evidence
 
-**Status (2026-09-24):** the approved MVP and version 0.1.8 subtitle-menu changes have been tested locally. This is not a release or a claim that all A01–A24 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
+**Status (2026-09-24):** the approved MVP and version 0.1.8 subtitle-menu changes have been tested locally. Version 0.1.9 adds appearance preview and one-shot cue replay with automated coverage; native UI checks for these additions are outstanding. This is not a release or a claim that all A01–A26 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
+
+## Appearance preview and cue replay (version 0.1.9)
+
+Appearance changes now preview in the overlay without writing preferences. Apply saves them; Back or native Settings dismissal restores the saved appearance and any native secondary visibility temporarily owned by the preview. Saving provider settings does not commit an appearance draft. The sidebar keeps draft inputs stable when streamed chat state updates.
+
+Replay line uses the captured source cue and current subtitle delay/speed, plays it once, and returns to the previous position and pause state without sending an AI request. Stop replay and Hide/Resume return early. User seeks, source-track or media changes, and a different player window do not receive a return seek. The implementation distinguishes the initial programmatic seek from a user seek using the observed position and a short time window; native event ordering still needs checking in installed IINA.
+
+`bun test` passed **62/62** checks with 385 assertions. `bun run package` passed TypeScript checking, Swift compilation, bundling, and packaging; `unzip -t` reported no errors for the 0.1.9 archive. Session and DOM tests cover preview rollback and save failure, replay completion and interruption, unknown media duration, delay/speed timing, and window isolation. These checks use synthetic state and a mock host. An isolated IINA process with synthetic media was launched, but the available UI control attached to the owner's already open IINA window rather than that separate process. No 0.1.9 preview or replay gesture was observed in installed IINA, and the owner's normal IINA configuration was not changed. A25 and A26 therefore remain **automated pass, native pending**.
 
 ## Installed IINA subtitle menu and package layout (version 0.1.8)
 
@@ -94,7 +102,7 @@ For 0.1.3, `bun test` passed 29 tests with 144 assertions, and `bun run build` p
 | `/Applications/IINA.app/Contents/MacOS/iina-plugin pack dist/io.github.hanifcarroll.iina-language-learning.iinaplugin` and `unzip -t` | Final `.iinaplgz` archive packed and every member, including `LICENSE` and the Swift executable, passed integrity check. The archive is ignored by Git. |
 | Installed IINA UI | Archive installed in a fresh isolated profile; restart loaded the plugin, external synthetic WebVTT was selectable, missing settings failed visibly without a request, settings saved a keyless local endpoint without a request, and Explain streamed and completed against a local mock server. |
 
-## A01–A24 acceptance matrix
+## A01–A26 acceptance matrix
 
 “Automated” means a unit/DOM/helper check. “Native” means observed in installed IINA with synthetic media. “Earlier product” and “harness” identify distinct builds. Partial rows list the remaining check; no row inherits proof from another level.
 
@@ -124,6 +132,8 @@ For 0.1.3, `bun test` passed 29 tests with 144 assertions, and `bun run build` p
 | A22 | **Partial.** Removing the action row prevents the selection button from shifting subtitle layout; exact before/after native pixel alignment remains unchecked. Installed 0.1.7 selected a word and ⌥⌘G toggled the panel. Earlier harness tested wrapped drag, pointer pass-through, dual display, fullscreen Back, and separate windows; 0.1.4 kept the composer pinned and scrolling. Product keyboard selection, app-focus dismissal, resize/display-scale, and stacked-line visual placement remain. |
 | A23 | **Automated pass, native partial.** Media change and teardown clear in-memory conversation and request ownership; only non-secret preferences and Keychain status persist. Installed archive loaded after restart. A final-product native chat-then-restart check remains. |
 | A24 | **Automated pass, native partial.** Parsers, request/body, cue, question, turn, answer, and SSE limits fail visibly; required context is not silently dropped. Native oversize-file and maximum-history UI checks remain. |
+| A25 | **Automated pass, native pending.** Session and DOM tests verify unsaved preview, Apply, Back, native dismissal, provider-save isolation, and native secondary visibility restoration. Installed-IINA visual and dismissal checks remain. |
+| A26 | **Automated pass, native pending.** Session tests verify cue playback, return state, Stop replay, user seek, source-track/media change, second-window isolation, and subtitle delay/speed. Installed-IINA event ordering, actual playback, and fullscreen/sidebar interaction remain. |
 
 ## Current limits and recovery
 

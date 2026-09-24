@@ -13,6 +13,7 @@ function fakePlayer(alreadyLoaded = false) {
   const writes: string[] = [];
   const states: any[] = [];
   const overlayMessages: string[] = [];
+  const overlayPayloads: Array<{ name: string; value: unknown }> = [];
   const actions: string[] = [];
   let panelShortcut: (() => void) | null = null;
   type FakeMenuItem = { title: string; action?: (() => void) | null; options?: { selected?: boolean; enabled?: boolean; keyBinding?: string };
@@ -22,7 +23,8 @@ function fakePlayer(alreadyLoaded = false) {
   const props = new Map<string, any>([['sub-visibility', true], ['sub-text', 'Ben öyle bir insan mıyım?'],
     ['sub-start', 0], ['sub-delay', 0], ['secondary-sub-delay', 0], ['sub-speed', 1],
     ['secondary-sub-visibility', true], ['secondary-sub-text', 'Am I that kind of person?']]);
-  const status = { url: 'file:///synthetic.mp4', position: 1, duration: 20, idle: false };
+  const status: { url: string; position: number; duration: number | null; idle: boolean; paused: boolean } =
+    { url: 'file:///synthetic.mp4', position: 1, duration: 20, idle: false, paused: false };
   const settings = { endpoint: 'http://127.0.0.1:47891', model: 'synthetic', sourceLanguage: 'Turkish',
     explanationLanguage: 'English', includeSecondary: true, noKeyRequired: true };
   const raw = {
@@ -30,7 +32,9 @@ function fakePlayer(alreadyLoaded = false) {
       tracks: [{ id: 1, isExternal: true, title: 'source', codec: 'subrip' },
         { id: 2, isExternal: true, title: 'secondary', codec: 'subrip' }],
       loadTrack: (_path: string) => { actions.push('load subtitle'); raw.core.subtitle.tracks.push({ id: 3, isExternal: true, title: 'English', codec: 'subrip' }); } },
-      pause: () => actions.push('pause'), resume: () => actions.push('resume') },
+      pause: () => { status.paused = true; actions.push('pause'); },
+      resume: () => { status.paused = false; actions.push('resume'); },
+      seekTo: (seconds: number) => { status.position = seconds; actions.push(`seek ${seconds}`); } },
     event: { on: (name: string, callback: () => void) => { events.set(name, callback); return name; },
       off: (name: string, id: string) => { if (name !== id) throw new Error('Wrong listener identifier'); events.delete(name); } },
     file: { read: (path: string) => path === '@sub/1' ? source : secondary,
@@ -39,9 +43,14 @@ function fakePlayer(alreadyLoaded = false) {
     mpv: { getString: (name: string) => props.get(name) ?? '', getNumber: (name: string) => props.get(name) ?? 0,
       getFlag: (name: string) => props.get(name) ?? false, set: (name: string, value: unknown) => { props.set(name, value); } },
     overlay: { simpleMode: () => actions.push('simple mode'), loadFile: () => { overlay.clear(); }, onMessage: (name: string, callback: (value: unknown) => void) => { overlay.set(name, callback); },
-      postMessage: (name: string) => overlayMessages.push(name), show: () => actions.push('overlay show'), hide: () => actions.push('overlay hide'), setClickable: () => {} },
+      postMessage: (name: string, encoded: string) => {
+        overlayMessages.push(name);
+        overlayPayloads.push({ name, value: JSON.parse(decodeURIComponent(encoded)) });
+      }, show: () => actions.push('overlay show'), hide: () => actions.push('overlay hide'), setClickable: () => {} },
     sidebar: { loadFile: () => { sidebar.clear(); }, onMessage: (name: string, callback: (value: unknown) => void) => { sidebar.set(name, callback); },
-      postMessage: (_name: string, encoded: string) => { states.push(JSON.parse(decodeURIComponent(encoded))); },
+      postMessage: (name: string, encoded: string) => {
+        if (name === 'state') states.push(JSON.parse(decodeURIComponent(encoded)));
+      },
       show: () => actions.push('sidebar show'), hide: () => actions.push('sidebar hide') },
     menu: { item: (title: string, action?: (() => void) | null, options?: FakeMenuItem['options']): FakeMenuItem => {
       if (options?.keyBinding) { expect(options.keyBinding).toBe('Alt+Meta+g'); panelShortcut = action ?? null; }
@@ -65,7 +74,8 @@ function fakePlayer(alreadyLoaded = false) {
   overlay.get('overlayReady')!({});
   sidebar.get('sidebarReady')!({});
   events.get('iina.menu-update')!();
-  return { session, raw, status, props, events, overlay, sidebar, frames, writes, states, actions, overlayMessages, menuItems,
+  return { session, raw, status, props, events, overlay, sidebar, frames, writes, states, actions,
+    overlayMessages, overlayPayloads, menuItems,
     setChosenFile: (path: string) => { chosenFile = path; },
     shortcut: () => panelShortcut?.(), tick: () => (session as any).tick(), close: () => events.get('iina.window-will-close')?.() };
 }
@@ -245,6 +255,220 @@ test('stacked secondary subtitle restores native state on disable and tracks app
   expect(player.props.get('secondary-sub-visibility')).toBe(false);
   player.sidebar.get('disableOverlay')!({});
   expect(player.props.get('secondary-sub-visibility')).toBe(true);
+  player.close();
+});
+
+test('appearance changes preview without saving and Back restores the owned native subtitle state', () => {
+  const player = fakePlayer();
+  const saved: unknown[] = [];
+  player.raw.preferences.set = (_name, value) => { saved.push(value); };
+  player.tick();
+  const draft = { showTranslation: true, sourceSize: 34, sourceColor: '#ffcc00', sourceBottom: 14,
+    translationSize: 26, translationColor: '#eeeeee', translationGap: 20 };
+
+  player.sidebar.get('settingsView')!({ open: true });
+  player.sidebar.get('previewAppearance')!(draft);
+  expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toEqual(draft);
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
+  expect(player.states.at(-1).settings.appearance.sourceSize).toBe(28);
+  expect(saved).toHaveLength(0);
+
+  player.sidebar.get('settingsView')!({ open: false });
+  expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toMatchObject({ sourceSize: 28 });
+  expect(player.props.get('secondary-sub-visibility')).toBe(true);
+  player.sidebar.get('settingsView')!({ open: true });
+  player.sidebar.get('previewAppearance')!(draft);
+  player.sidebar.get('saveAppearance')!(draft);
+  expect(saved).toHaveLength(1);
+  expect(player.states.at(-1).settings.appearance).toEqual(draft);
+  player.sidebar.get('disableOverlay')!({});
+  const messageCount = player.overlayPayloads.length;
+  player.sidebar.get('previewAppearance')!({ ...draft, sourceSize: 40 });
+  expect(player.overlayPayloads).toHaveLength(messageCount);
+  player.close();
+});
+
+test('native Settings dismissal discards unsaved subtitle preview without resuming playback', () => {
+  const player = fakePlayer();
+  select(player);
+  player.sidebar.get('settingsView')!({ open: true });
+  player.sidebar.get('previewAppearance')!({ showTranslation: true, sourceSize: 34, sourceColor: '#ffcc00',
+    sourceBottom: 14, translationSize: 26, translationColor: '#eeeeee', translationGap: 20 });
+  player.sidebar.get('visibility')!({ hidden: true });
+  expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toMatchObject({ sourceSize: 28 });
+  expect(player.props.get('secondary-sub-visibility')).toBe(true);
+  expect(player.actions).not.toContain('resume');
+  player.close();
+});
+
+test('failed appearance save keeps the stored appearance and Back removes its preview', () => {
+  const player = fakePlayer();
+  const draft = { showTranslation: true, sourceSize: 34, sourceColor: '#ffcc00', sourceBottom: 14,
+    translationSize: 26, translationColor: '#eeeeee', translationGap: 20 };
+  player.raw.preferences.set = () => { throw new Error('Storage unavailable'); };
+  player.sidebar.get('settingsView')!({ open: true });
+  player.sidebar.get('previewAppearance')!(draft);
+  player.sidebar.get('saveAppearance')!(draft);
+  expect(player.states.at(-1).status).toBe('Storage unavailable');
+  expect(player.states.at(-1).settings.appearance.sourceSize).toBe(28);
+  player.sidebar.get('settingsView')!({ open: false });
+  expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toMatchObject({ sourceSize: 28 });
+  player.close();
+});
+
+test('saving provider settings does not accidentally commit an appearance preview', () => {
+  const player = fakePlayer();
+  const saved: any[] = [];
+  player.raw.preferences.set = (_name, value) => { saved.push(value); };
+  player.sidebar.get('settingsView')!({ open: true });
+  player.sidebar.get('previewAppearance')!({ showTranslation: true, sourceSize: 34, sourceColor: '#ffcc00',
+    sourceBottom: 14, translationSize: 26, translationColor: '#eeeeee', translationGap: 20 });
+  player.sidebar.get('saveSettings')!({ endpoint: 'http://127.0.0.1:47891', model: 'synthetic',
+    sourceLanguage: 'Turkish', explanationLanguage: 'English', includeSecondary: true,
+    noKeyRequired: true, appearance: { showTranslation: true, sourceSize: 34 } });
+  expect(saved.at(-1).appearance.sourceSize).toBe(28);
+  expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toMatchObject({ sourceSize: 34 });
+  player.sidebar.get('settingsView')!({ open: false });
+  expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toMatchObject({ sourceSize: 28 });
+  player.close();
+});
+
+test('Replay line plays the captured cue once, returns to the watch position, and starts no request', () => {
+  const player = fakePlayer();
+  select(player);
+  const requests = player.frames.length;
+  player.sidebar.get('replayCue')!({});
+  expect(player.actions).toContain('seek 0');
+  expect(player.status.paused).toBe(false);
+  expect(player.states.at(-1).replaying).toBe(true);
+  player.status.position = 0.1;
+  player.tick();
+  player.status.position = 1.98;
+  player.tick();
+  expect(player.actions.at(-1)).toBe('seek 1');
+  expect(player.status.position).toBe(1);
+  expect(player.status.paused).toBe(true);
+  expect(player.states.at(-1).replaying).toBe(false);
+  expect(player.frames).toHaveLength(requests);
+  player.close();
+});
+
+test('Replay line can be stopped and respects user seeks, media replacement, and other windows', () => {
+  const left = fakePlayer();
+  const right = fakePlayer();
+  select(left);
+  select(right);
+  left.sidebar.get('replayCue')!({});
+  expect(right.actions).not.toContain('seek 0');
+  left.sidebar.get('replayCue')!({});
+  expect(left.status.position).toBe(1);
+  expect(left.status.paused).toBe(true);
+
+  left.sidebar.get('replayCue')!({});
+  left.status.position = 0.1;
+  left.tick();
+  left.status.position = 10;
+  left.events.get('mpv.seek')!();
+  left.tick();
+  expect(left.states.at(-1).replaying).toBe(false);
+  expect(left.status.position).toBe(10);
+
+  left.sidebar.get('replayCue')!({});
+  const oldReturns = left.actions.filter(action => action === 'seek 10').length;
+  left.status.url = 'file:///replacement.mp4';
+  left.events.get('mpv.file-loaded')!();
+  expect(left.states.at(-1).replaying).toBe(false);
+  expect(left.actions.filter(action => action === 'seek 10')).toHaveLength(oldReturns);
+  left.close(); right.close();
+});
+
+test('hiding the panel during replay returns to the watch position before resuming', () => {
+  const player = fakePlayer();
+  select(player);
+  player.sidebar.get('replayCue')!({});
+  player.status.position = 0.2;
+  player.tick();
+  player.sidebar.get('close')!({});
+  expect(player.status.position).toBe(1);
+  expect(player.status.paused).toBe(false);
+  expect(player.states.at(-1).replaying).toBe(false);
+  expect(player.states.at(-1).open).toBe(true);
+  player.close();
+});
+
+test('Replay line uses the selected cue timestamp with current subtitle delay and speed', () => {
+  const player = fakePlayer();
+  player.props.set('sub-delay', 1);
+  player.props.set('sub-speed', 2);
+  player.props.set('sub-text', 'Next cue');
+  player.props.set('sub-start', 4);
+  player.status.position = 3.5;
+  player.tick();
+  player.overlay.get('selected')!({ cue: { trackId: 1, index: 1, text: 'Next cue' },
+    start: 0, end: 4, text: 'Next' });
+  player.sidebar.get('replayCue')!({});
+  expect(player.actions).toContain('seek 3');
+  player.status.position = 3.1;
+  player.tick();
+  player.status.position = 3.98;
+  player.tick();
+  expect(player.status.position).toBe(3.5);
+  expect(player.status.paused).toBe(true);
+  player.close();
+});
+
+test('Replay line ignores its own seek event but cancels an immediate user seek', () => {
+  const player = fakePlayer();
+  select(player);
+  player.sidebar.get('replayCue')!({});
+  player.events.get('mpv.seek')!();
+  expect(player.states.at(-1).replaying).toBe(true);
+
+  player.status.position = 8;
+  player.events.get('mpv.seek')!();
+  expect(player.states.at(-1).replaying).toBe(false);
+  expect(player.status.position).toBe(8);
+  player.close();
+});
+
+test('Replay line still completes when seeking lands partway into a cue', () => {
+  const player = fakePlayer();
+  select(player);
+  player.sidebar.get('replayCue')!({});
+  player.status.position = 0.45;
+  player.tick();
+  player.status.position = 2.3;
+  player.tick();
+  expect(player.states.at(-1).replaying).toBe(false);
+  expect(player.status.position).toBe(1);
+  player.close();
+});
+
+test('Replay line works when the media duration is unavailable', () => {
+  const player = fakePlayer();
+  select(player);
+  player.status.duration = null;
+  player.sidebar.get('replayCue')!({});
+  expect(player.states.at(-1).replaying).toBe(true);
+  player.status.position = 0.1;
+  player.tick();
+  player.status.position = 1.98;
+  player.tick();
+  expect(player.status.position).toBe(1);
+  player.close();
+});
+
+test('changing the source track makes the captured line unavailable for replay', () => {
+  const player = fakePlayer();
+  select(player);
+  player.sidebar.get('replayCue')!({});
+  player.raw.core.subtitle.id = 2;
+  player.tick();
+  expect(player.states.at(-1).replaying).toBe(false);
+  expect(player.states.at(-1).replayAvailable).toBe(false);
+  const seeks = player.actions.filter(action => action.startsWith('seek ')).length;
+  player.sidebar.get('replayCue')!({});
+  expect(player.actions.filter(action => action.startsWith('seek '))).toHaveLength(seeks);
   player.close();
 });
 
