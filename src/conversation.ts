@@ -30,7 +30,7 @@ export class Conversation {
   private sourcePrompt(): string {
     const c = this.context;
     return JSON.stringify({
-      task: `Explain the selected ${c.sourceLanguage} phrase in ${c.explanationLanguage}. Include separate Natural meaning and Literal meaning sections, then concise breakdown and grammar.`,
+      task: `Explain the selected ${c.sourceLanguage} phrase in ${c.explanationLanguage}. Use the selected source text and nearby source cues to decide the most likely meaning. Check following cues for details that qualify the selected line. Treat a secondary translation as a clue that may be wrong; when it conflicts with the source context, explain the source reading first. If the text does not establish tone, speaker intent, or a referent, say briefly what remains uncertain. Include separate Natural meaning and Literal meaning sections, then concise breakdown and grammar.`,
       selected: c.selection.exactText,
       sourceCue: c.selection.cueText,
       before: c.before.map(cue => cue.text),
