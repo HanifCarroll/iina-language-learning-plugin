@@ -174,10 +174,10 @@ private final class Stream: NSObject, URLSessionDataDelegate, URLSessionTaskDele
   func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
     lock.lock(); lastByte = Date(); lock.unlock()
     pending.append(data)
-    if pending.count > maxEventBytes { cancel("event_too_large"); return }
     while let newline = pending.firstIndex(of: 10) {
       var line = pending.prefix(upTo: newline)
       pending.removeSubrange(...newline)
+      if line.count > maxEventBytes { cancel("event_too_large"); return }
       if line.last == 13 { line = line.dropLast() }
       guard let text = String(data: line, encoding: .utf8) else {
         cancel("invalid_utf8"); return
@@ -191,6 +191,9 @@ private final class Stream: NSObject, URLSessionDataDelegate, URLSessionTaskDele
         cancel("event_too_large"); return
       }
     }
+    // A single network callback may contain many small SSE events. Bound only
+    // the unfinished line/event, after draining the complete ones above.
+    if pending.count > maxEventBytes { cancel("event_too_large") }
   }
 
   private func processEvent() {

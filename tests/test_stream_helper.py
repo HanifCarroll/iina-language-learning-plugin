@@ -74,6 +74,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
+        if self.path == "/batched-events":
+            event = b'data: {"choices":[{"delta":{"content":"x"}}]}\n\n'
+            self.wfile.write(event * 2000 + b"data: [DONE]\n\n")
+            self.wfile.flush()
+            return
         if self.path == "/invalid":
             self.wfile.write(b"data: {broken}\n\n")
             self.wfile.flush()
@@ -159,6 +164,11 @@ class HelperTest(unittest.TestCase):
         self.assertEqual(len([line for line in lines if line.startswith("DELTA ")]), 3)
         self.assertLess(times[0], times[-1] - 0.4)
         self.assertIn((self.server.server_port, "/stream", True, True), Handler.seen)
+
+    def test_many_small_events_in_one_network_write(self):
+        lines, _ = self.run_helper(self.url("/batched-events"))
+        self.assertEqual(lines[-1], "DONE")
+        self.assertEqual(len([line for line in lines if line.startswith("DELTA ")]), 2000)
 
     def test_stop(self):
         lines, _ = self.run_helper(self.url("/stream"), stop_after_delta=True)

@@ -21,8 +21,8 @@ const worksheet = (mock ? {
   run: { model: string; promptCommit: string; reviewer: string };
   results: Record<string, { status: string; answer: string }>;
 };
-if (evalCases.some(item => worksheet.results[item.id]?.status !== 'not_run')) {
-  throw new Error('The eval worksheet already has attempted cases; preserve it and start a fresh worksheet');
+if (evalCases.some(item => !['not_run', 'complete'].includes(worksheet.results[item.id]?.status))) {
+  throw new Error('The eval worksheet has an incomplete or failed case; review it before retrying');
 }
 
 async function readKey(): Promise<string> {
@@ -81,6 +81,7 @@ async function runCase(messages: unknown): Promise<{ status: 'complete' | 'incom
 }
 
 for (const item of evalCases) {
+  if (worksheet.results[item.id].status === 'complete') continue;
   const result = await runCase(requestFor(item).messages);
   worksheet.results[item.id].status = result.status;
   worksheet.results[item.id].answer = result.answer;

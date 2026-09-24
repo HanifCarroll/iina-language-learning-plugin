@@ -18,7 +18,7 @@ python3 tests/test_stream_helper.py dist/io.github.hanifcarroll.iina-language-le
 /Applications/IINA.app/Contents/MacOS/iina-plugin pack dist/io.github.hanifcarroll.iina-language-learning.iinaplugin
 ```
 
-The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored `.iinaplugin` folder under `dist/`. IINA's bundled packer writes an ignored `.iinaplgz` archive in the current directory. Install the archive through IINA's plugin settings. Version 0.1.5 initializes in an already loaded player window; if the Language Learning sidebar is temporarily empty after reinstalling, reopen it or restart IINA. The project does not modify IINA itself.
+The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored `.iinaplugin` folder under `dist/`. IINA's bundled packer writes an ignored `.iinaplgz` archive in the current directory. Install the archive through IINA's plugin settings. Version 0.1.6 initializes in an already loaded player window; if the Language Learning sidebar is temporarily empty after reinstalling, reopen it or restart IINA. The project does not modify IINA itself.
 
 ## Use
 
