@@ -1,11 +1,12 @@
 import type { Keychain } from './credentials';
 
-export type SubtitleTrack = { id: number; isExternal: boolean; title: string | null; codec: string | null };
+export type SubtitleTrack = { id: number; isExternal: boolean; title: string | null; formattedTitle?: string; codec: string | null };
+export type MenuItem = { addSubMenuItem(item: MenuItem): MenuItem };
 export type RawIina = {
   core: {
     status: { url: string; position: number; duration: number; idle: boolean };
     window: { loaded: boolean; visible: boolean };
-    subtitle: { id: number | null; secondID: number | null; tracks: SubtitleTrack[] };
+    subtitle: { id: number | null; secondID: number | null; tracks: SubtitleTrack[]; loadTrack(path: string): void };
     pause(): void; resume(): void;
   };
   event: { on(name: string, callback: () => void): string; off(name: string, id: string): void };
@@ -16,9 +17,12 @@ export type RawIina = {
     postMessage(name: string, value: string): void; show(): void; hide(): void; setClickable(value: boolean): void };
   sidebar: { loadFile(path: string): void; onMessage(name: string, callback: (data: unknown) => void): void;
     postMessage(name: string, value: string): void; show(): void; hide(): void };
-  menu: { item(title: string, action: () => void, options: { keyBinding: string }): unknown; addItem(item: unknown): void };
+  menu: { item(title: string, action?: (() => void) | null,
+    options?: { keyBinding?: string; selected?: boolean; enabled?: boolean }): MenuItem;
+    addItem(item: MenuItem): void; removeAllItems(): void };
   preferences: { get(name: string): unknown; set(name: string, value: unknown): void; sync(): void };
   utils: Keychain & { resolvePath(path: string): string;
+    chooseFile(title: string, options: { allowedFileTypes: string[] }): Promise<string>;
     exec(path: string, args: string[], cwd: null, stdout: (chunk: string) => void, stderr: null): Promise<{ status: number }> };
 };
 
@@ -37,6 +41,7 @@ export class IinaHost {
   get displayedSource(): string { return this.raw.mpv.getString('sub-text') || ''; }
   get displayedStartMs(): number { return this.raw.mpv.getNumber('sub-start') * 1000; }
   get secondaryText(): string { return this.raw.mpv.getString('secondary-sub-text') || ''; }
+  get subtitleTracks(): SubtitleTrack[] { return this.raw.core.subtitle.tracks; }
   get windowVisible(): boolean { return this.raw.core.window.visible; }
   get playable(): boolean {
     const status = this.raw.core.status;
@@ -52,6 +57,14 @@ export class IinaHost {
     if (typeof text !== 'string') throw new Error('Selected external subtitle file is unreadable');
     return text;
   }
+
+  chooseSubtitleFile(): Promise<string> {
+    return this.raw.utils.chooseFile('Add SRT or VTT subtitles', { allowedFileTypes: ['srt', 'vtt'] });
+  }
+
+  loadSubtitleFile(path: string): void { this.raw.core.subtitle.loadTrack(path); }
+  selectSource(id: number): void { this.raw.core.subtitle.id = id; }
+  selectSecondary(id: number): void { this.raw.core.subtitle.secondID = id; }
 
   ownPrimary(): void {
     if (this.ownedPrimary !== null) return;

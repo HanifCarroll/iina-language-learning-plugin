@@ -4,7 +4,8 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "evals": "bun tests/eval_runner.ts",
-    "build": "sh scripts/build.sh"
+    "build": "sh scripts/build.sh",
+    "package": "sh scripts/package.sh"
   },
   "dependencies": {
     "markdown-it": "15.0.2"

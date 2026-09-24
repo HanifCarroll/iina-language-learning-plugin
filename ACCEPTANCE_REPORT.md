@@ -1,6 +1,14 @@
 # Product acceptance evidence
 
-**Status (2026-09-24):** the approved MVP and version 0.1.7 UI changes have been tested locally. This is not a release or a claim that all A01–A24 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
+**Status (2026-09-24):** the approved MVP and version 0.1.8 subtitle-menu changes have been tested locally. This is not a release or a claim that all A01–A24 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
+
+## Installed IINA subtitle menu and package layout (version 0.1.8)
+
+The Plugin menu now offers **Add SRT/VTT File…**, **Source Subtitle**, and **Secondary Subtitle** in the owner's installed IINA 1.5.0-beta2. With *Leyla ile Mecnun* open, the file picker accepted an ignored synthetic SRT and the Plugin menu then listed it as track #4 under both roles. A cold restart cleared the test track; the owner's movie was returned to 00:50 and paused. The installed `main.js` hash matched the final 0.1.8 build. No provider request was made. The local session test exercised both role-selection callbacks and rejected a picker result from an earlier movie. Native clicking of an individual submenu track was not completed through the computer-control tool, so that final gesture remains unverified in installed IINA.
+
+Calling IINA's `menu.forceUpdate()` during plugin startup caused two native `EXC_BREAKPOINT` crashes in `MenuController.updatePluginMenu()` (`IINA-2026-09-24-113936.ips` and `IINA-2026-09-24-114004.ips`). The final package does not call it; it rebuilds track choices on IINA's `iina.menu-update` event when the menu opens. Two subsequent cold launches showed the menu and file picker without that crash. This establishes the tested startup path, not a guarantee against every host menu failure.
+
+`bun test` passed **49/49** checks; `bun run package` passed TypeScript checking, Swift compilation, bundling, and IINA packaging; `unzip -t` found no archive errors. The package folder and current archive are now under ignored `dist/`. Older root archives were removed as disposable generated files. The packaged helper and model evals were not rerun because their code did not change.
 
 ## Installed IINA selection and subtitle UI (version 0.1.7)
 

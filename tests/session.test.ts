@@ -15,6 +15,10 @@ function fakePlayer(alreadyLoaded = false) {
   const overlayMessages: string[] = [];
   const actions: string[] = [];
   let panelShortcut: (() => void) | null = null;
+  type FakeMenuItem = { title: string; action?: (() => void) | null; options?: { selected?: boolean; enabled?: boolean; keyBinding?: string };
+    items: FakeMenuItem[]; addSubMenuItem(item: FakeMenuItem): FakeMenuItem };
+  const menuItems: FakeMenuItem[] = [];
+  let chosenFile = '/tmp/synthetic-english.srt';
   const props = new Map<string, any>([['sub-visibility', true], ['sub-text', 'Ben öyle bir insan mıyım?'],
     ['sub-start', 0], ['sub-delay', 0], ['secondary-sub-delay', 0], ['sub-speed', 1],
     ['secondary-sub-visibility', true], ['secondary-sub-text', 'Am I that kind of person?']]);
@@ -24,7 +28,8 @@ function fakePlayer(alreadyLoaded = false) {
   const raw = {
     core: { status, window: { loaded: alreadyLoaded, visible: true }, subtitle: { id: 1, secondID: 2,
       tracks: [{ id: 1, isExternal: true, title: 'source', codec: 'subrip' },
-        { id: 2, isExternal: true, title: 'secondary', codec: 'subrip' }] },
+        { id: 2, isExternal: true, title: 'secondary', codec: 'subrip' }],
+      loadTrack: (_path: string) => { actions.push('load subtitle'); raw.core.subtitle.tracks.push({ id: 3, isExternal: true, title: 'English', codec: 'subrip' }); } },
       pause: () => actions.push('pause'), resume: () => actions.push('resume') },
     event: { on: (name: string, callback: () => void) => { events.set(name, callback); return name; },
       off: (name: string, id: string) => { if (name !== id) throw new Error('Wrong listener identifier'); events.delete(name); } },
@@ -38,11 +43,13 @@ function fakePlayer(alreadyLoaded = false) {
     sidebar: { loadFile: () => { sidebar.clear(); }, onMessage: (name: string, callback: (value: unknown) => void) => { sidebar.set(name, callback); },
       postMessage: (_name: string, encoded: string) => { states.push(JSON.parse(decodeURIComponent(encoded))); },
       show: () => actions.push('sidebar show'), hide: () => actions.push('sidebar hide') },
-    menu: { item: (_title: string, action: () => void, options: { keyBinding: string }) => {
-      expect(options.keyBinding).toBe('Alt+Meta+g'); panelShortcut = action; return action;
-    }, addItem: () => {} },
+    menu: { item: (title: string, action?: (() => void) | null, options?: FakeMenuItem['options']): FakeMenuItem => {
+      if (options?.keyBinding) { expect(options.keyBinding).toBe('Alt+Meta+g'); panelShortcut = action ?? null; }
+      return { title, action, options, items: [], addSubMenuItem(item) { this.items.push(item); return this; } };
+    }, addItem: (item: FakeMenuItem) => menuItems.push(item), removeAllItems: () => { menuItems.length = 0; } },
     preferences: { get: () => settings, set: () => {}, sync: () => {} },
     utils: { keychainRead: () => false, keychainWrite: () => true,
+      chooseFile: async () => chosenFile,
       resolvePath: (path: string) => path.startsWith('@data') ? '/tmp/plugins/.data/id' : '/tmp/private',
       exec: (_path: string, _args: string[], _cwd: null, hook: (value: string) => void) => {
         frames.push(hook); return new Promise<{ status: number }>(() => {});
@@ -57,7 +64,9 @@ function fakePlayer(alreadyLoaded = false) {
   events.get('iina.plugin-overlay-loaded')!();
   overlay.get('overlayReady')!({});
   sidebar.get('sidebarReady')!({});
-  return { session, raw, status, props, events, overlay, sidebar, frames, writes, states, actions, overlayMessages,
+  events.get('iina.menu-update')!();
+  return { session, raw, status, props, events, overlay, sidebar, frames, writes, states, actions, overlayMessages, menuItems,
+    setChosenFile: (path: string) => { chosenFile = path; },
     shortcut: () => panelShortcut?.(), tick: () => (session as any).tick(), close: () => events.get('iina.window-will-close')?.() };
 }
 
@@ -67,6 +76,45 @@ test('late install initializes an already loaded player only once', () => {
   expect(player.states.at(-1).status).toBe('Select a subtitle phrase to begin.');
   player.events.get('iina.window-loaded')!();
   expect(player.actions.filter(action => action === 'simple mode')).toHaveLength(1);
+  player.close();
+});
+
+test('Plugin menu loads an SRT and selects source and secondary tracks in this window', async () => {
+  const player = fakePlayer();
+  expect(player.menuItems.map(item => item.title)).toEqual([
+    'Toggle Language Learning Panel', 'Add SRT/VTT File…', 'Source Subtitle', 'Secondary Subtitle'
+  ]);
+  player.menuItems[1].action?.();
+  await Promise.resolve();
+  expect(player.actions).toContain('load subtitle');
+  player.events.get('iina.menu-update')!();
+  const sourceMenu = player.menuItems.find(item => item.title === 'Source Subtitle')!;
+  const secondaryMenu = player.menuItems.find(item => item.title === 'Secondary Subtitle')!;
+  expect(sourceMenu.action).toBeNull();
+  expect(secondaryMenu.action).toBeNull();
+  expect(sourceMenu.items.map(item => item.title)).toEqual(['Off', 'source', 'secondary', 'English']);
+  secondaryMenu.items.at(-1)!.action?.();
+  expect(player.raw.core.subtitle.secondID).toBe(3);
+  sourceMenu.items[0].action?.();
+  expect(player.raw.core.subtitle.id).toBe(0);
+  player.events.get('iina.menu-update')!();
+  expect(player.menuItems.find(item => item.title === 'Secondary Subtitle')!.items.at(-1)!.options?.selected).toBe(true);
+  player.close();
+});
+
+test('a file picked for an earlier movie is not loaded into replacement media', async () => {
+  const player = fakePlayer();
+  const oldSourceAction = player.menuItems.find(item => item.title === 'Source Subtitle')!.items[0].action!;
+  let finishPick!: (path: string) => void;
+  player.raw.utils.chooseFile = () => new Promise(resolve => { finishPick = resolve; });
+  player.menuItems[1].action?.();
+  player.status.url = 'file:///replacement.mp4';
+  player.events.get('mpv.file-loaded')!();
+  finishPick('/tmp/synthetic-english.srt');
+  await Promise.resolve();
+  expect(player.actions).not.toContain('load subtitle');
+  oldSourceAction();
+  expect(player.raw.core.subtitle.id).toBe(1);
   player.close();
 });
 

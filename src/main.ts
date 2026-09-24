@@ -88,6 +88,7 @@ export class Session {
   private cueIdentity = '';
   private translationText = '';
   private timer: ReturnType<typeof setInterval> | null = null;
+  private subtitleMenuState = '';
   private listeners: Array<{ name: string; id: string }> = [];
   private closed = false;
 
@@ -102,9 +103,9 @@ export class Session {
 
   start(): void {
     const { event } = this.host.raw;
-    const { menu } = this.host.raw;
-    menu.addItem(menu.item('Toggle Language Learning Panel', () => this.togglePanel(), { keyBinding: 'Alt+Meta+g' }));
+    this.refreshSubtitleMenu();
     const on = (name: string, callback: () => void) => this.listeners.push({ name, id: event.on(name, callback) });
+    on('iina.menu-update', () => this.refreshSubtitleMenu());
     on('iina.window-loaded', () => this.windowLoaded());
     on('mpv.file-loaded', () => { this.ended = false; this.mediaChanged(); });
     on('mpv.seek', () => this.seek());
@@ -172,6 +173,60 @@ export class Session {
       this.sidebarVisible = true;
       this.render();
     }
+  }
+
+  private refreshSubtitleMenu(): void {
+    // 1. Read the tracks and selections for this player window.
+    const tracks = this.host.subtitleTracks;
+    const sourceId = this.host.sourceId;
+    const secondaryId = this.host.secondaryId;
+    const signature = JSON.stringify([this.mediaUrl, sourceId, secondaryId,
+      tracks.map(track => [track.id, track.formattedTitle, track.title])]);
+    if (signature === this.subtitleMenuState) return;
+
+    // 2. Rebuild the menu before IINA displays it.
+    const { menu } = this.host.raw;
+    const epoch = this.mediaEpoch;
+    menu.removeAllItems();
+    menu.addItem(menu.item('Toggle Language Learning Panel', () => this.togglePanel(), { keyBinding: 'Alt+Meta+g' }));
+    menu.addItem(menu.item('Add SRT/VTT File…', () => { void this.addSubtitleFile(); }, { enabled: !!this.mediaUrl }));
+
+    // 3. Add IINA's current tracks under each subtitle role.
+    for (const [name, selectedId, select] of [
+      ['Source Subtitle', sourceId, (id: number) => { if (epoch === this.mediaEpoch) this.host.selectSource(id); }],
+      ['Secondary Subtitle', secondaryId, (id: number) => { if (epoch === this.mediaEpoch) this.host.selectSecondary(id); }]
+    ] as const) {
+      const group = menu.item(name, null);
+      group.addSubMenuItem(menu.item('Off', () => select(0), { selected: selectedId === null || selectedId === 0 }));
+      for (const track of tracks) {
+        const title = track.formattedTitle || track.title || `Track ${track.id}`;
+        group.addSubMenuItem(menu.item(title, () => select(track.id), { selected: selectedId === track.id }));
+      }
+      menu.addItem(group);
+    }
+
+    this.subtitleMenuState = signature;
+  }
+
+  private async addSubtitleFile(): Promise<void> {
+    // 1. Associate the picker with the movie that opened it.
+    const epoch = this.mediaEpoch;
+    if (!this.mediaUrl || this.closed) return;
+
+    // 2. Load only a supported file while that movie still owns the window.
+    try {
+      const path = await this.host.chooseSubtitleFile();
+      if (!path || this.closed || epoch !== this.mediaEpoch || this.mediaUrl !== this.host.mediaUrl) return;
+
+      if (!/\.(srt|vtt)$/i.test(path)) throw new Error('Choose an SRT or VTT subtitle file');
+
+      this.host.loadSubtitleFile(path);
+      this.status = 'Subtitle file submitted to IINA. Choose its role from the Plugin menu.';
+    } catch (error) {
+      this.status = error instanceof Error ? error.message : 'Could not load subtitle file';
+    }
+
+    this.render();
   }
 
   private readCues(id: number): Cue[] {

@@ -28,6 +28,7 @@ On the owner's Mac, using a local video and supplied Turkish/English text subtit
 | Conversation dismissal | **Automatically resume playback** when the user hides the active conversation panel; keep its chat available in that player window. |
 | Source context | Complete selected cue plus up to **three preceding and three following source cues**. Context size is fixed for the MVP. |
 | Secondary subtitles | Turkish/source text is selectable. An optional stacked mode shows IINA's selected English/secondary track above it, with separate display controls. It starts off; native secondary rendering is restored when that mode is off. |
+| Track controls | The plugin menu can add an external SRT/VTT file and choose loaded source and secondary tracks. IINA still owns the actual tracks and playback. |
 | Secondary text in requests | Include available English/secondary subtitle context by default, with a **configurable on/off setting** independent of subtitle visibility. |
 | Initial explanation | Natural meaning, **literal meaning every time**, breakdown, relevant grammar/morphology, and contextual/idiomatic notes. Keep it brief. |
 | Learner profile | A small built-in beginner-learner brief; no editable profile or system-prompt editor yet. |
@@ -99,7 +100,7 @@ Restore only the native visibility state owned by this window on track/media cha
 
 ### Normal flow
 
-1. The user opens a video and selects subtitle tracks using IINA.
+1. The user opens a video and adds/selects source and secondary tracks from the plugin menu or IINA's own subtitle controls.
 2. The plugin shows selectable source text; secondary subtitles remain visible if enabled in IINA.
 3. The user completes a word or phrase selection. Capture an immutable selection/context snapshot, pause playback, and open the sidebar. Validate configuration before transmitting anything.
 4. Send one request to the configured provider and stream its answer into the sidebar.

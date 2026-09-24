@@ -13,16 +13,15 @@ Install Bun, Swift/Xcode command-line tools, and IINA. Then run:
 ```sh
 bun install --frozen-lockfile
 bun test
-bun run build
+bun run package
 python3 tests/test_stream_helper.py dist/io.github.hanifcarroll.iina-language-learning.iinaplugin/native/stream-helper
-/Applications/IINA.app/Contents/MacOS/iina-plugin pack dist/io.github.hanifcarroll.iina-language-learning.iinaplugin
 ```
 
-The build runs `tsc --noEmit`, compiles the Swift helper, and writes an ignored `.iinaplugin` folder under `dist/`. IINA's bundled packer writes an ignored `.iinaplgz` archive in the current directory. Install the archive through IINA's plugin settings. Version 0.1.7 initializes in an already loaded player window; if the Language Learning sidebar is temporarily empty after reinstalling, reopen it or restart IINA. The project does not modify IINA itself.
+Packaging runs `tsc --noEmit`, compiles the Swift helper, and writes the ignored `.iinaplugin` folder and `.iinaplgz` archive under `dist/`. Install the archive through IINA's plugin settings. Old package archives are disposable build outputs; Git history keeps the source for older versions. Version 0.1.8 initializes in an already loaded player window; if the Language Learning sidebar is temporarily empty after reinstalling, reopen it or restart IINA. The project does not modify IINA itself.
 
 ## Use
 
-1. Open a video in IINA and load a UTF-8 SRT or WebVTT source track. To show English above Turkish, load an English track as IINA's **Secondary Subtitle**, then enable **Show secondary subtitle above source** in plugin Settings. This option starts off. The plugin draws the secondary line above its selectable source line and temporarily hides IINA's duplicate native text. Adjust each line's size and color, the source distance from the bottom, and the gap between lines. Turning off stacked display restores native secondary rendering.
+1. Open a video in IINA. Under **Plugin → IINA Language Learning**, use **Add SRT/VTT File…** to add each subtitle file, then choose the Turkish track under **Source Subtitle** and the English track under **Secondary Subtitle**. IINA's native subtitle controls still work. To show English above Turkish, enable **Show secondary subtitle above source** in plugin Settings. This option starts off. The plugin draws the secondary line above its selectable source line and temporarily hides IINA's duplicate native text. Adjust each line's size and color, the source distance from the bottom, and the gap between lines. Turning off stacked display restores native secondary rendering.
 2. Open the Language Learning sidebar and enter an HTTPS API base URL and model. The plugin appends `/chat/completions`. HTTP is accepted only for `localhost`, `127.0.0.1`, or `::1` test endpoints. Enter an API key unless the endpoint needs none. Save settings before selecting text. A newly entered key goes directly to the plugin's verified IINA Keychain API; saved keys are never shown in the sidebar.
 3. Double-click a word or drag across a phrase in the source subtitle. Completing the selection pauses playback, opens the conversation, and sends one request to the configured provider; a single click without selected text does nothing. Send follow-ups from the same sidebar. **Stop** marks partial output incomplete; **Retry** manually starts a new request for that turn. **Hide / Resume** hides the panel, keeps the chat in this window, and resumes eligible playback of the same media. Press **⌥⌘G** to hide or reopen the panel. A follow-up after reopening pauses playback again; the next selected phrase replaces the previous conversation.
 
