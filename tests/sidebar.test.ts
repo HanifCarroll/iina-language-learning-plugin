@@ -101,12 +101,12 @@ test('subtitle view lists IINA tracks and sends window-bound selections without 
     { id: 2, title: 'English', isExternal: true },
     { id: 3, title: '<img src=x>', isExternal: false }
   ];
-  const state = (sourceId: number, hasMedia = true) => handlers.get('state')!(encodeURIComponent(JSON.stringify({
+  const state = (sourceId: number, hasMedia = true, secondaryBelowSource = false) => handlers.get('state')!(encodeURIComponent(JSON.stringify({
     status: 'Select a subtitle phrase to begin.', open: false, conversationId: null, overlayEnabled: true,
     replaying: false, replayAvailable: false, phrase: '', cue: '', turns: [],
     mediaEpoch: 7, hasMedia, sourceId, secondaryId: 2, subtitleTracks: tracks,
     settings: { endpoint: '', model: '', sourceLanguage: 'Turkish', explanationLanguage: 'English',
-      includeSecondary: true, noKeyRequired: false, hasSavedKey: false, requestUrl: '',
+      includeSecondary: true, noKeyRequired: false, secondaryBelowSource, hasSavedKey: false, requestUrl: '',
       appearance: { sourceSize: 28, sourceColor: '#ffffff', sourceBottom: 8,
         translationSize: 25, translationColor: '#ffffff', translationGap: 12 } }
   })));
@@ -122,6 +122,13 @@ test('subtitle view lists IINA tracks and sends window-bound selections without 
   expect(source.options[3].textContent).toContain('(IINA only)');
   expect(window.document.querySelector('#appearanceControls')?.hasAttribute('open')).toBe(false);
   expect(window.document.querySelector('#aiView')?.hasAttribute('hidden')).toBe(true);
+  const swap = window.document.querySelector('#swapSubtitleOrder') as unknown as HTMLButtonElement;
+  expect(swap.disabled).toBe(false);
+  expect(window.document.querySelector('#subtitleOrder')?.textContent).toBe('Top: English · Bottom: Turkish');
+  swap.click();
+  expect(sent.at(-1)).toEqual({ name: 'swapSubtitleOrder', data: {} });
+  state(1, true, true);
+  expect(window.document.querySelector('#subtitleOrder')?.textContent).toBe('Top: Turkish · Bottom: English');
 
   source.value = '3';
   source.dispatchEvent(new window.Event('change') as unknown as Event);
@@ -133,6 +140,7 @@ test('subtitle view lists IINA tracks and sends window-bound selections without 
 
   state(3, false);
   expect(source.disabled).toBe(true);
+  expect(swap.disabled).toBe(true);
   expect(secondary.disabled).toBe(true);
   expect((window.document.querySelector('#addSubtitleFile') as unknown as HTMLButtonElement).disabled).toBe(true);
   window.happyDOM.abort();

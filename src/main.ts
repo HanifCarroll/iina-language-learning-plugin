@@ -10,7 +10,7 @@ const PLUGIN_ID = 'io.github.hanifcarroll.iina-language-learning';
 
 type Settings = {
   endpoint: string; model: string; sourceLanguage: string; explanationLanguage: string;
-  includeSecondary: boolean; noKeyRequired: boolean; appearance: Appearance;
+  includeSecondary: boolean; noKeyRequired: boolean; secondaryBelowSource: boolean; appearance: Appearance;
 };
 type Appearance = { sourceSize: number; sourceColor: string; sourceBottom: number;
   translationSize: number; translationColor: string; translationGap: number };
@@ -21,7 +21,7 @@ const DEFAULT_APPEARANCE: Appearance = { sourceSize: 28, sourceColor: '#ffffff',
   sourceBottom: 8, translationSize: 25, translationColor: '#ffffff', translationGap: 12 };
 const DEFAULTS: Settings = {
   endpoint: '', model: '', sourceLanguage: 'Turkish', explanationLanguage: 'English',
-  includeSecondary: true, noKeyRequired: false, appearance: DEFAULT_APPEARANCE
+  includeSecondary: true, noKeyRequired: false, secondaryBelowSource: false, appearance: DEFAULT_APPEARANCE
 };
 
 function validAppearance(value: unknown): Appearance {
@@ -57,6 +57,7 @@ function validSettings(value: unknown): Settings {
   const endpoint = canonicalEndpoint(String(data.endpoint ?? '')).base;
   return { endpoint, model, sourceLanguage, explanationLanguage,
     includeSecondary: data.includeSecondary, noKeyRequired: data.noKeyRequired,
+    secondaryBelowSource: data.secondaryBelowSource === true,
     appearance: validAppearance(data.appearance) };
 }
 
@@ -102,6 +103,7 @@ export class Session {
     const stored = host.raw.preferences.get('settings');
     this.settings = stored && typeof stored === 'object' ? { ...DEFAULTS, ...(stored as object),
       appearance: { ...DEFAULT_APPEARANCE, ...((stored as { appearance?: object }).appearance ?? {}) } } : { ...DEFAULTS };
+    this.settings.secondaryBelowSource = this.settings.secondaryBelowSource === true;
     delete (this.settings.appearance as Appearance & { showTranslation?: boolean }).showTranslation;
     try { if (this.settings.endpoint) this.hasSavedKey = this.credentials.hasSavedKey(this.settings.endpoint); }
     catch { /* invalid old configuration remains visibly unusable */ }
@@ -145,6 +147,7 @@ export class Session {
       this.overlayReady = true;
       if (this.overlayEnabled) this.host.showOverlay();
       this.host.toOverlay('appearance', this.appearancePreview ?? this.settings.appearance);
+      this.host.toOverlay('subtitleOrder', this.settings.secondaryBelowSource);
       this.updateCue(true);
     });
     overlay.onMessage('selected', value => this.selectionReceived(value));
@@ -163,6 +166,7 @@ export class Session {
     sidebar.onMessage('previewAppearance', value => this.previewAppearance(value));
     sidebar.onMessage('addSubtitleFile', () => { void this.addSubtitleFile(); });
     sidebar.onMessage('selectSubtitleTrack', value => this.selectSubtitleTrack(value));
+    sidebar.onMessage('swapSubtitleOrder', () => this.swapSubtitleOrder());
     sidebar.onMessage('settingsView', value => {
       const data = value as { open?: unknown; view?: unknown } | null;
       this.settingsOpen = data?.view === 'subtitles' || data?.view === 'ai' ||
@@ -563,7 +567,8 @@ export class Session {
 
   private saveSettings(value: unknown): void {
     try {
-      const next = validSettings({ ...(value as object), appearance: this.settings.appearance });
+      const next = validSettings({ ...(value as object), appearance: this.settings.appearance,
+        secondaryBelowSource: this.settings.secondaryBelowSource });
       const key = (value as { key?: unknown }).key;
       if (key !== '' && key !== undefined) {
         if (typeof key !== 'string') throw new Error('Invalid API key');
@@ -578,6 +583,20 @@ export class Session {
       this.status = 'Settings saved. No request was sent.';
     } catch (error) { this.status = error instanceof Error ? error.message : 'Could not save settings'; }
     this.render();
+  }
+
+  private swapSubtitleOrder(): void {
+    const next = { ...this.settings, secondaryBelowSource: !this.settings.secondaryBelowSource };
+    try {
+      this.host.raw.preferences.set('settings', next);
+      this.host.raw.preferences.sync();
+      this.settings = next;
+      if (this.overlayReady) this.host.toOverlay('subtitleOrder', next.secondaryBelowSource);
+      this.render();
+    } catch (error) {
+      this.status = error instanceof Error ? error.message : 'Could not save subtitle order';
+      this.render();
+    }
   }
 
   private saveAppearance(value: unknown): void {

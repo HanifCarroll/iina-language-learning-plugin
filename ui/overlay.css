@@ -4,3 +4,5 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent
 #cue{font-size:var(--source-size,28px);color:var(--source-color,#fff);user-select:text;-webkit-user-select:text;cursor:text}
 #translation{font-size:var(--translation-size,25px);color:var(--translation-color,#fff);margin-bottom:var(--translation-gap,12px);pointer-events:none}
 #translation:empty{display:none}
+#wrap[data-secondary-below-source=true]{display:flex;flex-direction:column-reverse}
+#wrap[data-secondary-below-source=true] #translation{margin-bottom:0;margin-top:var(--translation-gap,12px)}

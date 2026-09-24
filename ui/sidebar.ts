@@ -9,7 +9,8 @@ type ViewState = {
   subtitleTracks: Array<{ id: number; title: string; isExternal: boolean }>;
   turns: Array<{ question: string; answer: string; status: string; error?: string }>;
   settings: { endpoint: string; model: string; sourceLanguage: string; explanationLanguage: string;
-    includeSecondary: boolean; noKeyRequired: boolean; hasSavedKey: boolean; requestUrl: string;
+    includeSecondary: boolean; noKeyRequired: boolean; secondaryBelowSource: boolean;
+    hasSavedKey: boolean; requestUrl: string;
     appearance: { sourceSize: number; sourceColor: string; sourceBottom: number;
       translationSize: number; translationColor: string; translationGap: number } };
 };
@@ -92,6 +93,12 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     element('aiView').hidden = view !== 'ai';
     element('conversation').hidden = !state.open;
     renderTrackChoices();
+    const sourceTrack = state.subtitleTracks?.find(track => track.id === state.sourceId);
+    const secondaryTrack = state.subtitleTracks?.find(track => track.id === state.secondaryId);
+    const top = state.settings.secondaryBelowSource ? sourceTrack : secondaryTrack;
+    const bottom = state.settings.secondaryBelowSource ? secondaryTrack : sourceTrack;
+    element('subtitleOrder').textContent = `Top: ${top?.title ?? '—'} · Bottom: ${bottom?.title ?? '—'}`;
+    element<HTMLButtonElement>('swapSubtitleOrder').disabled = !state.hasMedia || !sourceTrack || !secondaryTrack;
     const conversationChanged = renderedConversationId !== state.conversationId;
     if (conversationChanged) {
       renderedConversationId = state.conversationId;
@@ -181,6 +188,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   element('subtitlesTab').addEventListener('click', () => setView('subtitles'));
   element('aiTab').addEventListener('click', () => setView('ai'));
   element('addSubtitleFile').addEventListener('click', () => bridge.postMessage('addSubtitleFile', {}));
+  element('swapSubtitleOrder').addEventListener('click', () => bridge.postMessage('swapSubtitleOrder', {}));
   for (const [id, role] of [['sourceTrack', 'source'], ['secondaryTrack', 'secondary']] as const) {
     element<HTMLSelectElement>(id).addEventListener('change', () => bridge.postMessage('selectSubtitleTrack', {
       role, id: Number(element<HTMLSelectElement>(id).value), epoch: state?.mediaEpoch

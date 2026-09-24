@@ -28,3 +28,27 @@ test('DOM selection survives cue update, while seek clears it', async () => {
   expect(cue.textContent).toBe('Next cue');
   window.happyDOM.abort();
 });
+
+test('subtitle order swaps without changing source selection or secondary text', async () => {
+  const window = new Window();
+  (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;
+  window.document.body.innerHTML = '<div id="wrap"><div id="translation"></div><div id="cue"></div></div>';
+  const style = window.document.createElement('style');
+  style.textContent = await Bun.file('ui/overlay.css').text();
+  window.document.head.append(style);
+  const handlers = new Map<string, (data: string) => void>();
+  mountOverlay(window.document as unknown as Document, {
+    onMessage: (name, callback) => { handlers.set(name, callback); }, postMessage: () => {}
+  });
+  const wrap = window.document.querySelector('#wrap')!;
+  handlers.get('cue')!(encodeURIComponent(JSON.stringify({ trackId: 1, index: 0, text: 'Turkish source' })));
+  handlers.get('translation')!(encodeURIComponent(JSON.stringify('English secondary')));
+  handlers.get('subtitleOrder')!(encodeURIComponent(JSON.stringify(true)));
+  expect(wrap.getAttribute('data-secondary-below-source')).toBe('true');
+  expect(window.getComputedStyle(wrap).flexDirection).toBe('column-reverse');
+  expect(window.document.querySelector('#cue')?.textContent).toBe('Turkish source');
+  expect(window.document.querySelector('#translation')?.textContent).toBe('English secondary');
+  handlers.get('subtitleOrder')!(encodeURIComponent(JSON.stringify(false)));
+  expect(wrap.getAttribute('data-secondary-below-source')).toBe('false');
+  window.happyDOM.abort();
+});

@@ -311,6 +311,30 @@ test('selected secondary stays above source through cue gaps and restores native
   player.close();
 });
 
+test('swapping subtitle positions persists without changing tracks, native visibility, or starting a request', () => {
+  const player = fakePlayer();
+  const saved: any[] = [];
+  player.raw.preferences.set = (_name, value) => { saved.push(value); };
+  const actionCount = player.actions.length;
+  const streamCount = player.frames.length;
+  player.sidebar.get('swapSubtitleOrder')!({});
+  expect(saved.at(-1).secondaryBelowSource).toBe(true);
+  expect(player.states.at(-1).settings.secondaryBelowSource).toBe(true);
+  expect(player.overlayPayloads.filter(item => item.name === 'subtitleOrder').at(-1)?.value).toBe(true);
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
+  expect(player.raw.core.subtitle.id).toBe(1);
+  expect(player.raw.core.subtitle.secondID).toBe(2);
+  expect(player.actions).toHaveLength(actionCount);
+  expect(player.frames).toHaveLength(streamCount);
+  player.sidebar.get('saveSettings')!({ endpoint: 'http://127.0.0.1:47891', model: 'synthetic',
+    sourceLanguage: 'Turkish', explanationLanguage: 'English', includeSecondary: true,
+    noKeyRequired: true, key: '' });
+  expect(player.states.at(-1).settings.secondaryBelowSource).toBe(true);
+  player.sidebar.get('swapSubtitleOrder')!({});
+  expect(player.overlayPayloads.filter(item => item.name === 'subtitleOrder').at(-1)?.value).toBe(false);
+  player.close();
+});
+
 test('appearance changes preview without saving and leaving Subtitles restores native state', () => {
   const player = fakePlayer();
   const saved: unknown[] = [];

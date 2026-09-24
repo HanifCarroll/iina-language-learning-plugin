@@ -57,6 +57,13 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
   });
   bridge.onMessage('seek', () => { state.seek(); doc.getSelection()?.removeAllRanges(); render(); });
   bridge.onMessage('clear', dismiss);
+  bridge.onMessage('subtitleOrder', encoded => {
+    if (!wrap) return;
+    try {
+      const below: unknown = JSON.parse(decodeURIComponent(encoded));
+      if (typeof below === 'boolean') wrap.dataset.secondaryBelowSource = String(below);
+    } catch { /* ignore malformed host message */ }
+  });
   bridge.onMessage('appearance', encoded => {
     if (!wrap) return;
     try {

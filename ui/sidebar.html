@@ -39,7 +39,8 @@
     <p class="hint">Select an external SRT or VTT track to explain its text.</p>
     <label for="secondaryTrack">Secondary subtitle</label>
     <select id="secondaryTrack"></select>
-    <p class="hint">A selected secondary track appears above the source subtitle.</p>
+    <p id="subtitleOrder" class="hint">Secondary above source</p>
+    <button id="swapSubtitleOrder" type="button">Swap subtitle positions</button>
     <button id="addSubtitleFile" type="button">Add SRT/VTT file…</button>
 
     <details id="appearanceControls">
@@ -47,10 +48,10 @@
       <p class="notice">Changes preview on the video. Apply saves them; leaving this view restores the saved appearance.</p>
       <label>Source size (px)<input id="sourceSize" type="number" min="16" max="56"></label>
       <label>Source color<input id="sourceColor" type="color"></label>
-      <label>Source distance from bottom (%)<input id="sourceBottom" type="number" min="4" max="35"></label>
+      <label>Subtitle stack distance from bottom (%)<input id="sourceBottom" type="number" min="4" max="35"></label>
       <label>Secondary size (px)<input id="translationSize" type="number" min="16" max="56"></label>
       <label>Secondary color<input id="translationColor" type="color"></label>
-      <label>Secondary gap above source (px)<input id="translationGap" type="number" min="0" max="80"></label>
+      <label>Gap between subtitles (px)<input id="translationGap" type="number" min="0" max="80"></label>
       <button id="saveAppearance" type="button">Apply appearance</button>
     </details>
 

@@ -1,5 +1,9 @@
 # Product acceptance evidence
 
+## Subtitle order control (version 0.1.11 candidate)
+
+The Subtitles view now shows the selected top and bottom track names and a **Swap subtitle positions** button. The order is saved independently of appearance previews; the source track remains the selectable one. `bun run release:check` passed **66/66** Bun tests with **446 assertions**, TypeScript checking, Swift compilation, archive integrity, and **10/10** controlled helper tests. The 0.1.11 archive is in ignored `dist/`. This candidate has not been installed or visually checked in IINA yet; the owner's movie was open during this work. The AI request and streaming path was not changed. The separate latency diagnosis is based on source inspection and DeepSeek's published API behavior, not a new billable timing run.
+
 **Status (2026-09-24):** Neden 0.1.10 is packaged, installed in IINA, and automated checks pass. It always places a selected secondary subtitle above the source while the source overlay is usable, and has an on/off switch for the selectable overlay. The installed controls and two subtitle text nodes were observed after a cold restart; exact visual spacing and a native switch-off check remain pending. Earlier installed checks are recorded below. This is not a release or a claim that all A01–A26 scenarios have passed in IINA. `docs/SPEC.md` remains the behavior contract. [INTEGRATION_MILESTONE.md](docs/history/INTEGRATION_MILESTONE.md) records earlier disposable-harness results; they are labeled below where relevant and do not prove product behavior.
 
 ## Always-stacked secondary and overlay switch (version 0.1.10 candidate)

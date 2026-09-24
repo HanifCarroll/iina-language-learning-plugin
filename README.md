@@ -13,7 +13,7 @@ bun install --frozen-lockfile
 bun run release:check
 ```
 
-In IINA's plugin settings, choose **Install Local Package** and select `dist/io.github.hanifcarroll.iina-language-learning.iinaplugin-0.1.10.iinaplgz`. Restart IINA after an update; hot plugin reload crashed in one test of IINA 1.5.0-beta2. The GitHub repository installation route will be available only after a public release with an archive asset is published.
+In IINA's plugin settings, choose **Install Local Package** and select `dist/io.github.hanifcarroll.iina-language-learning.iinaplugin-0.1.11.iinaplgz`. Restart IINA after an update; hot plugin reload crashed in one test of IINA 1.5.0-beta2. The GitHub repository installation route will be available only after a public release with an archive asset is published.
 
 ## Use it
 
@@ -22,7 +22,7 @@ In IINA's plugin settings, choose **Install Local Package** and select `dist/io.
 3. Double-click a source word or drag across a phrase. Completing the selection pauses playback and **immediately sends one request**. It may incur a provider charge. A click without selected text does nothing.
 4. Read the streamed explanation and ask follow-ups in the same chat. **Replay line** plays the selected cue once without another AI request, then returns to your previous position and pause state; **Stop replay** returns early. **Stop** marks a partial answer incomplete. **Hide / Resume** retains the chat in that player window and resumes eligible playback. **⌥⌘G** hides or reopens the sidebar. Selecting another phrase replaces the chat.
 
-The sidebar separates **Chat**, **Subtitles**, and **AI settings**. When both tracks are selected and the source overlay is usable, Neden always draws the secondary line above the selectable source line. Under **Subtitles → Appearance**, size, color, and vertical spacing can be adjusted separately. Appearance edits preview on the video; **Apply appearance** saves them, while leaving Subtitles restores the saved values. Saving AI settings alone does not save an appearance preview. The **Include secondary subtitle text in AI context** setting controls requests independently of display. To put plugin sidebars on the right in the tested IINA version, use **Video → Show Video Panel → Layout → Sidebar Position → Plugins**; that IINA setting affects all plugin sidebars.
+The sidebar separates **Chat**, **Subtitles**, and **AI settings**. When both tracks are selected and the source overlay is usable, Neden stacks the secondary and selectable source lines. **Swap subtitle positions** reverses their order and saves that choice. Under **Subtitles → Appearance**, size, color, and vertical spacing can be adjusted separately. Appearance edits preview on the video; **Apply appearance** saves them, while leaving Subtitles restores the saved values. Saving AI settings alone does not save an appearance preview. The **Include secondary subtitle text in AI context** setting controls requests independently of display. To put plugin sidebars on the right in the tested IINA version, use **Video → Show Video Panel → Layout → Sidebar Position → Plugins**; that IINA setting affects all plugin sidebars.
 
 ## Privacy and limits
 
