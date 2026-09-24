@@ -13,7 +13,7 @@ bun install --frozen-lockfile
 bun run release:check
 ```
 
-In IINA's plugin settings, choose **Install Local Package** and select `dist/io.github.hanifcarroll.iina-language-learning.iinaplugin-0.1.9.iinaplgz`. Restart IINA after an update; hot plugin reload crashed in one test of IINA 1.5.0-beta2. The GitHub repository installation route will be available only after a public release with an archive asset is published.
+In IINA's plugin settings, choose **Install Local Package** and select `dist/io.github.hanifcarroll.iina-language-learning.iinaplugin-0.1.10.iinaplgz`. Restart IINA after an update; hot plugin reload crashed in one test of IINA 1.5.0-beta2. The GitHub repository installation route will be available only after a public release with an archive asset is published.
 
 ## Use it
 
@@ -22,7 +22,7 @@ In IINA's plugin settings, choose **Install Local Package** and select `dist/io.
 3. Double-click a source word or drag across a phrase. Completing the selection pauses playback and **immediately sends one request**. It may incur a provider charge. A click without selected text does nothing.
 4. Read the streamed explanation and ask follow-ups in the same chat. **Replay line** plays the selected cue once without another AI request, then returns to your previous position and pause state; **Stop replay** returns early. **Stop** marks a partial answer incomplete. **Hide / Resume** retains the chat in that player window and resumes eligible playback. **⌥⌘G** hides or reopens the sidebar. Selecting another phrase replaces the chat.
 
-The sidebar separates **Chat**, **Subtitles**, and **AI settings**. Under **Subtitles → Appearance**, the optional **Show secondary subtitle above source** setting draws the translation above the selectable source line. Size, color, and vertical spacing can be adjusted separately. Appearance edits preview on the video; **Apply appearance** saves them, while leaving Subtitles restores the saved values. Saving AI settings alone does not save an appearance preview. This display setting is independent of **Include secondary subtitle text in AI context**. To put plugin sidebars on the right in the tested IINA version, use **Video → Show Video Panel → Layout → Sidebar Position → Plugins**; that IINA setting affects all plugin sidebars.
+The sidebar separates **Chat**, **Subtitles**, and **AI settings**. When both tracks are selected and the source overlay is usable, Neden always draws the secondary line above the selectable source line. Under **Subtitles → Appearance**, size, color, and vertical spacing can be adjusted separately. Appearance edits preview on the video; **Apply appearance** saves them, while leaving Subtitles restores the saved values. Saving AI settings alone does not save an appearance preview. The **Include secondary subtitle text in AI context** setting controls requests independently of display. To put plugin sidebars on the right in the tested IINA version, use **Video → Show Video Panel → Layout → Sidebar Position → Plugins**; that IINA setting affects all plugin sidebars.
 
 ## Privacy and limits
 
@@ -30,7 +30,7 @@ A request sends the selected phrase, its complete cue, up to three earlier and t
 
 The bundled Swift helper performs real incremental HTTPS streaming. It needs IINA's **video-overlay** and **file-system** permissions; the latter permits the helper to make network requests outside IINA's own HTTP domain checks. It accepts HTTP only for explicit loopback test endpoints. System TLS validation and same-origin redirect restrictions apply. The helper has first-byte, idle, and total request timeouts of 20, 30, and 120 seconds. Cancellation invalidates late UI results, but it cannot guarantee that a provider stops work or billing immediately.
 
-Use **Disable Overlay** under **Subtitles → Overlay control** before disabling the plugin. Raw disable in IINA Preferences has no teardown callback in the tested version: a helper can run until its total timeout, subtitles can remain hidden, and playback can remain paused. If needed, recover with **Subtitles → Show Subtitles**, **Subtitles → Show Secondary Subtitles**, and **Playback → Resume**.
+Turn **Selectable subtitle overlay** off under **Subtitles → Overlay control** before disabling the plugin. Turning it off cancels active work, clears the chat, resumes eligible playback, and restores native subtitles. Raw disable in IINA Preferences has no teardown callback in the tested version: a helper can run until its total timeout, subtitles can remain hidden, and playback can remain paused. If needed, recover with **Subtitles → Show Subtitles**, **Subtitles → Show Secondary Subtitles**, and **Playback → Resume**.
 
 Each subtitle file is limited to 8 MiB and 50,000 cues; each cue or selection to 4,000 characters; each follow-up to 2,000 characters; chat to 20 turns; request JSON to 128 KiB; and an answer or SSE event to 64 KiB. Limits fail visibly. Full-length user-supplied SRT/VTT files within these limits are valid inputs. Complete commercial subtitle tracks are not included in this repository.
 

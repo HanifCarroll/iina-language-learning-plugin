@@ -10,7 +10,7 @@ type ViewState = {
   turns: Array<{ question: string; answer: string; status: string; error?: string }>;
   settings: { endpoint: string; model: string; sourceLanguage: string; explanationLanguage: string;
     includeSecondary: boolean; noKeyRequired: boolean; hasSavedKey: boolean; requestUrl: string;
-    appearance: { showTranslation: boolean; sourceSize: number; sourceColor: string; sourceBottom: number;
+    appearance: { sourceSize: number; sourceColor: string; sourceBottom: number;
       translationSize: number; translationColor: string; translationGap: number } };
 };
 
@@ -82,7 +82,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     const routineStatus = ['Complete', 'Generating…', 'Preparing explanation…'];
     status.hidden = routineStatus.includes(state.status) ||
       (view !== 'chat' && state.status === 'Select a subtitle phrase to begin.');
-    element('disableOverlay').textContent = state.overlayEnabled ? 'Disable Overlay' : 'Enable Overlay';
+    element<HTMLInputElement>('overlayEnabled').checked = state.overlayEnabled;
     for (const [tab, name] of [['chatTab', 'chat'], ['subtitlesTab', 'subtitles'], ['aiTab', 'ai']] as const) {
       if (view === name) element(tab).setAttribute('aria-current', 'page');
       else element(tab).removeAttribute('aria-current');
@@ -150,7 +150,6 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     element<HTMLInputElement>('includeSecondary').checked = state.settings.includeSecondary;
     element<HTMLInputElement>('noKeyRequired').checked = state.settings.noKeyRequired;
     if (!appearanceDraftActive) {
-      element<HTMLInputElement>('showTranslation').checked = state.settings.appearance.showTranslation;
       for (const key of ['sourceSize', 'sourceColor', 'sourceBottom', 'translationSize', 'translationColor', 'translationGap'] as const) {
         element<HTMLInputElement>(key).value = String(state.settings.appearance[key]);
       }
@@ -169,7 +168,6 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
 
   function readAppearance(): ViewState['settings']['appearance'] {
     return {
-      showTranslation: element<HTMLInputElement>('showTranslation').checked,
       sourceSize: Number(element<HTMLInputElement>('sourceSize').value),
       sourceColor: element<HTMLInputElement>('sourceColor').value,
       sourceBottom: Number(element<HTMLInputElement>('sourceBottom').value),
@@ -193,9 +191,12 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   element('retry').addEventListener('click', () => bridge.postMessage('retry', {}));
   element('replay').addEventListener('click', () => bridge.postMessage('replayCue', {}));
   element('close').addEventListener('click', () => bridge.postMessage('close', {}));
-  element('disableOverlay').addEventListener('click', () => bridge.postMessage(state?.overlayEnabled ? 'disableOverlay' : 'enableOverlay', {}));
+  element<HTMLInputElement>('overlayEnabled').addEventListener('change', () => {
+    const enabled = element<HTMLInputElement>('overlayEnabled').checked;
+    bridge.postMessage(enabled ? 'enableOverlay' : 'disableOverlay', {});
+  });
   element('saveAppearance').addEventListener('click', () => bridge.postMessage('saveAppearance', readAppearance()));
-  for (const key of ['showTranslation', 'sourceSize', 'sourceColor', 'sourceBottom', 'translationSize', 'translationColor', 'translationGap']) {
+  for (const key of ['sourceSize', 'sourceColor', 'sourceBottom', 'translationSize', 'translationColor', 'translationGap']) {
     element(key).addEventListener('input', () => bridge.postMessage('previewAppearance', readAppearance()));
   }
   element('saveSettings').addEventListener('click', () => {

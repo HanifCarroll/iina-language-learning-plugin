@@ -39,12 +39,12 @@
     <p class="hint">Select an external SRT or VTT track to explain its text.</p>
     <label for="secondaryTrack">Secondary subtitle</label>
     <select id="secondaryTrack"></select>
+    <p class="hint">A selected secondary track appears above the source subtitle.</p>
     <button id="addSubtitleFile" type="button">Add SRT/VTT file…</button>
 
     <details id="appearanceControls">
       <summary>Appearance</summary>
       <p class="notice">Changes preview on the video. Apply saves them; leaving this view restores the saved appearance.</p>
-      <label class="checkbox"><input id="showTranslation" type="checkbox">Show secondary subtitle above source</label>
       <label>Source size (px)<input id="sourceSize" type="number" min="16" max="56"></label>
       <label>Source color<input id="sourceColor" type="color"></label>
       <label>Source distance from bottom (%)<input id="sourceBottom" type="number" min="4" max="35"></label>
@@ -55,8 +55,8 @@
     </details>
 
     <details class="advanced"><summary>Overlay control</summary>
-      <p class="notice">Disable Overlay restores native subtitle visibility before disabling the plugin in IINA.</p>
-      <button id="disableOverlay" type="button">Disable Overlay</button>
+      <label class="checkbox"><input id="overlayEnabled" type="checkbox" role="switch">Selectable subtitle overlay</label>
+      <p class="notice">Turning this off stops any response, clears the chat, resumes eligible playback, and restores native subtitles. Turn it off before disabling Neden in IINA.</p>
     </details>
   </section>
 

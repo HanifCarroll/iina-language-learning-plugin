@@ -18,7 +18,7 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
     settings: { endpoint: 'https://example.com/v1', model: 'test', sourceLanguage: 'Turkish',
       explanationLanguage: 'English', includeSecondary: true, noKeyRequired: false,
       hasSavedKey: false, requestUrl: 'https://example.com/v1/chat/completions',
-      appearance: { showTranslation: false, sourceSize: 28, sourceColor: '#ffffff', sourceBottom: 8,
+      appearance: { sourceSize: 28, sourceColor: '#ffffff', sourceBottom: 8,
         translationSize: 25, translationColor: '#ffffff', translationGap: 12 } }
   })));
   expect(window.document.querySelectorAll('img,script')).toHaveLength(1); // packaged script element only
@@ -44,10 +44,10 @@ test('appearance inputs preview without saving, leaving Subtitles discards the d
     onMessage: (name, callback) => { handlers.set(name, callback); },
     postMessage: (name, data) => sent.push({ name, data })
   });
-  const appearance = { showTranslation: false, sourceSize: 28, sourceColor: '#ffffff', sourceBottom: 8,
+  const appearance = { sourceSize: 28, sourceColor: '#ffffff', sourceBottom: 8,
     translationSize: 25, translationColor: '#ffffff', translationGap: 12 };
-  const state = (replaying = false) => handlers.get('state')!(encodeURIComponent(JSON.stringify({
-    status: 'Complete', open: true, conversationId: 1, overlayEnabled: true,
+  const state = (replaying = false, overlayEnabled = true) => handlers.get('state')!(encodeURIComponent(JSON.stringify({
+    status: 'Complete', open: true, conversationId: 1, overlayEnabled,
     replayAvailable: true, replaying, phrase: 'öyle', cue: 'Ben öyle bir insan mıyım?',
     turns: [{ question: '', answer: 'Meaning', status: 'complete' }],
     settings: { endpoint: '', model: '', sourceLanguage: 'Turkish', explanationLanguage: 'English',
@@ -62,6 +62,7 @@ test('appearance inputs preview without saving, leaving Subtitles discards the d
   expect(replay.textContent).toBe('Stop replay');
 
   (window.document.querySelector('#subtitlesTab') as unknown as HTMLButtonElement).click();
+  expect(window.document.querySelector('#showTranslation')).toBeNull();
   (window.document.querySelector('#appearanceControls') as unknown as HTMLDetailsElement).open = true;
   const size = window.document.querySelector('#sourceSize') as unknown as HTMLInputElement;
   size.value = '34';
@@ -74,6 +75,14 @@ test('appearance inputs preview without saving, leaving Subtitles discards the d
   expect(sent.at(-1)).toEqual({ name: 'settingsView', data: { open: false, view: 'chat' } });
   (window.document.querySelector('#subtitlesTab') as unknown as HTMLButtonElement).click();
   expect(size.value).toBe('28');
+  const overlay = window.document.querySelector('#overlayEnabled') as unknown as HTMLInputElement;
+  expect(overlay.checked).toBe(true);
+  overlay.click();
+  expect(sent.at(-1)).toEqual({ name: 'disableOverlay', data: {} });
+  state(false, false);
+  expect(overlay.checked).toBe(false);
+  overlay.click();
+  expect(sent.at(-1)).toEqual({ name: 'enableOverlay', data: {} });
   window.happyDOM.abort();
 });
 
@@ -98,7 +107,7 @@ test('subtitle view lists IINA tracks and sends window-bound selections without 
     mediaEpoch: 7, hasMedia, sourceId, secondaryId: 2, subtitleTracks: tracks,
     settings: { endpoint: '', model: '', sourceLanguage: 'Turkish', explanationLanguage: 'English',
       includeSecondary: true, noKeyRequired: false, hasSavedKey: false, requestUrl: '',
-      appearance: { showTranslation: false, sourceSize: 28, sourceColor: '#ffffff', sourceBottom: 8,
+      appearance: { sourceSize: 28, sourceColor: '#ffffff', sourceBottom: 8,
         translationSize: 25, translationColor: '#ffffff', translationGap: 12 } }
   })));
 

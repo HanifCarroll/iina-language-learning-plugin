@@ -26,7 +26,9 @@ function fakePlayer(alreadyLoaded = false) {
   const status: { url: string; position: number; duration: number | null; idle: boolean; paused: boolean } =
     { url: 'file:///synthetic.mp4', position: 1, duration: 20, idle: false, paused: false };
   const settings = { endpoint: 'http://127.0.0.1:47891', model: 'synthetic', sourceLanguage: 'Turkish',
-    explanationLanguage: 'English', includeSecondary: true, noKeyRequired: true };
+    explanationLanguage: 'English', includeSecondary: true, noKeyRequired: true,
+    appearance: { showTranslation: false, sourceSize: 28, sourceColor: '#ffffff', sourceBottom: 8,
+      translationSize: 25, translationColor: '#ffffff', translationGap: 12 } };
   const raw = {
     core: { status, window: { loaded: alreadyLoaded, visible: true }, subtitle: { id: 1, secondID: 2,
       tracks: [{ id: 1, isExternal: true, title: 'source', codec: 'subrip' },
@@ -271,18 +273,39 @@ test('a follow-up after reopening retained chat pauses playback again', () => {
   player.close();
 });
 
-test('stacked secondary subtitle restores native state on disable and tracks appearance changes', () => {
+test('selected secondary stays above source through cue gaps and restores native rendering on mismatch or disable', () => {
   const player = fakePlayer();
   player.tick();
-  expect(player.props.get('secondary-sub-visibility')).toBe(true);
+  expect(player.states.at(-1).settings.appearance).not.toHaveProperty('showTranslation');
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
   expect(player.overlayMessages).toContain('translation');
-  player.sidebar.get('saveAppearance')!({ showTranslation: false, sourceSize: 33, sourceColor: '#eeeeee',
-    sourceBottom: 12, translationSize: 24, translationColor: '#ffffff', translationGap: 18 });
-  expect(player.props.get('secondary-sub-visibility')).toBe(true);
-  expect(player.states.at(-1).settings.appearance.sourceSize).toBe(33);
-  player.sidebar.get('saveAppearance')!({ showTranslation: true, sourceSize: 33, sourceColor: '#eeeeee',
+  expect(player.overlayPayloads.filter(item => item.name === 'translation').at(-1)?.value).toBe('Am I that kind of person?');
+  player.sidebar.get('saveAppearance')!({ sourceSize: 33, sourceColor: '#eeeeee',
     sourceBottom: 12, translationSize: 24, translationColor: '#ffffff', translationGap: 18 });
   expect(player.props.get('secondary-sub-visibility')).toBe(false);
+  expect(player.states.at(-1).settings.appearance.sourceSize).toBe(33);
+
+  player.status.position = 3;
+  player.props.set('sub-text', '');
+  player.tick();
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
+
+  player.props.set('sub-text', 'Unexpected source text');
+  player.tick();
+  expect(player.props.get('secondary-sub-visibility')).toBe(true);
+
+  player.status.position = 1;
+  player.props.set('sub-text', 'Ben öyle bir insan mıyım?');
+  player.tick();
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
+
+  player.raw.core.subtitle.secondID = 0;
+  player.tick();
+  expect(player.props.get('secondary-sub-visibility')).toBe(true);
+  player.raw.core.subtitle.secondID = 2;
+  player.tick();
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
+
   player.sidebar.get('disableOverlay')!({});
   expect(player.props.get('secondary-sub-visibility')).toBe(true);
   player.close();
@@ -293,7 +316,7 @@ test('appearance changes preview without saving and leaving Subtitles restores n
   const saved: unknown[] = [];
   player.raw.preferences.set = (_name, value) => { saved.push(value); };
   player.tick();
-  const draft = { showTranslation: true, sourceSize: 34, sourceColor: '#ffcc00', sourceBottom: 14,
+  const draft = { sourceSize: 34, sourceColor: '#ffcc00', sourceBottom: 14,
     translationSize: 26, translationColor: '#eeeeee', translationGap: 20 };
 
   player.sidebar.get('settingsView')!({ open: true, view: 'subtitles' });
@@ -305,7 +328,7 @@ test('appearance changes preview without saving and leaving Subtitles restores n
 
   player.sidebar.get('settingsView')!({ open: false, view: 'chat' });
   expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toMatchObject({ sourceSize: 28 });
-  expect(player.props.get('secondary-sub-visibility')).toBe(true);
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
   player.sidebar.get('settingsView')!({ open: true, view: 'subtitles' });
   player.sidebar.get('previewAppearance')!(draft);
   player.sidebar.get('saveAppearance')!(draft);
@@ -322,18 +345,18 @@ test('native Settings dismissal discards unsaved subtitle preview without resumi
   const player = fakePlayer();
   select(player);
   player.sidebar.get('settingsView')!({ open: true, view: 'subtitles' });
-  player.sidebar.get('previewAppearance')!({ showTranslation: true, sourceSize: 34, sourceColor: '#ffcc00',
+  player.sidebar.get('previewAppearance')!({ sourceSize: 34, sourceColor: '#ffcc00',
     sourceBottom: 14, translationSize: 26, translationColor: '#eeeeee', translationGap: 20 });
   player.sidebar.get('visibility')!({ hidden: true });
   expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toMatchObject({ sourceSize: 28 });
-  expect(player.props.get('secondary-sub-visibility')).toBe(true);
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
   expect(player.actions).not.toContain('resume');
   player.close();
 });
 
 test('failed appearance save keeps the stored appearance and leaving Subtitles removes its preview', () => {
   const player = fakePlayer();
-  const draft = { showTranslation: true, sourceSize: 34, sourceColor: '#ffcc00', sourceBottom: 14,
+  const draft = { sourceSize: 34, sourceColor: '#ffcc00', sourceBottom: 14,
     translationSize: 26, translationColor: '#eeeeee', translationGap: 20 };
   player.raw.preferences.set = () => { throw new Error('Storage unavailable'); };
   player.sidebar.get('settingsView')!({ open: true, view: 'subtitles' });
@@ -351,11 +374,11 @@ test('saving provider settings does not accidentally commit an appearance previe
   const saved: any[] = [];
   player.raw.preferences.set = (_name, value) => { saved.push(value); };
   player.sidebar.get('settingsView')!({ open: true, view: 'subtitles' });
-  player.sidebar.get('previewAppearance')!({ showTranslation: true, sourceSize: 34, sourceColor: '#ffcc00',
+  player.sidebar.get('previewAppearance')!({ sourceSize: 34, sourceColor: '#ffcc00',
     sourceBottom: 14, translationSize: 26, translationColor: '#eeeeee', translationGap: 20 });
   player.sidebar.get('saveSettings')!({ endpoint: 'http://127.0.0.1:47891', model: 'synthetic',
     sourceLanguage: 'Turkish', explanationLanguage: 'English', includeSecondary: true,
-    noKeyRequired: true, appearance: { showTranslation: true, sourceSize: 34 } });
+    noKeyRequired: true, appearance: { sourceSize: 34 } });
   expect(saved.at(-1).appearance.sourceSize).toBe(28);
   expect(player.overlayPayloads.filter(item => item.name === 'appearance').at(-1)?.value).toMatchObject({ sourceSize: 34 });
   player.sidebar.get('settingsView')!({ open: true, view: 'ai' });

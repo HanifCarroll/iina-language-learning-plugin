@@ -12,12 +12,12 @@ type Settings = {
   endpoint: string; model: string; sourceLanguage: string; explanationLanguage: string;
   includeSecondary: boolean; noKeyRequired: boolean; appearance: Appearance;
 };
-type Appearance = { showTranslation: boolean; sourceSize: number; sourceColor: string; sourceBottom: number;
+type Appearance = { sourceSize: number; sourceColor: string; sourceBottom: number;
   translationSize: number; translationColor: string; translationGap: number };
 type CueReplay = { epoch: number; url: string; conversationId: number; startMs: number; endMs: number;
   returnPositionMs: number; wasPaused: boolean; startedAt: number; phase: 'starting' | 'playing';
   sawPlaying: boolean; awaitingInitialSeek: boolean };
-const DEFAULT_APPEARANCE: Appearance = { showTranslation: false, sourceSize: 28, sourceColor: '#ffffff',
+const DEFAULT_APPEARANCE: Appearance = { sourceSize: 28, sourceColor: '#ffffff',
   sourceBottom: 8, translationSize: 25, translationColor: '#ffffff', translationGap: 12 };
 const DEFAULTS: Settings = {
   endpoint: '', model: '', sourceLanguage: 'Turkish', explanationLanguage: 'English',
@@ -37,8 +37,7 @@ function validAppearance(value: unknown): Appearance {
     if (typeof item !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(item)) throw new Error(`Invalid ${key}`);
     return item;
   };
-  if (typeof data.showTranslation !== 'boolean') throw new Error('Invalid English display setting');
-  return { showTranslation: data.showTranslation, sourceSize: number('sourceSize', 16, 56),
+  return { sourceSize: number('sourceSize', 16, 56),
     sourceColor: color('sourceColor'), sourceBottom: number('sourceBottom', 4, 35),
     translationSize: number('translationSize', 16, 56), translationColor: color('translationColor'),
     translationGap: number('translationGap', 0, 80) };
@@ -103,6 +102,7 @@ export class Session {
     const stored = host.raw.preferences.get('settings');
     this.settings = stored && typeof stored === 'object' ? { ...DEFAULTS, ...(stored as object),
       appearance: { ...DEFAULT_APPEARANCE, ...((stored as { appearance?: object }).appearance ?? {}) } } : { ...DEFAULTS };
+    delete (this.settings.appearance as Appearance & { showTranslation?: boolean }).showTranslation;
     try { if (this.settings.endpoint) this.hasSavedKey = this.credentials.hasSavedKey(this.settings.endpoint); }
     catch { /* invalid old configuration remains visibly unusable */ }
   }
@@ -328,7 +328,7 @@ export class Session {
       this.secondary = [];
       if (this.host.externalTrack(secondaryId) && secondaryId !== null) {
         try { this.secondary = this.readCues(secondaryId); }
-        catch { /* native secondary remains visible; context simply has no parsed secondary cues */ }
+        catch { /* display uses IINA's current text; context has no parsed secondary cues */ }
       }
     }
     if (changed) this.render();
@@ -338,6 +338,7 @@ export class Session {
     if (!this.overlayReady || !this.overlayEnabled) return;
     const sourceId = this.sourceId;
     let cue: Cue | null = null;
+    let sourceReady = false;
     if (sourceId !== null && this.source) {
       cue = cueAt(this.source, this.host.positionMs, this.host.delayMs, this.host.subtitleSpeed);
       const displayed = this.host.displayedSource;
@@ -348,14 +349,15 @@ export class Session {
         this.host.restoreSecondary();
         if (this.status !== mismatch) { this.status = mismatch; this.render(); }
       } else {
+        sourceReady = true;
         this.host.ownPrimary();
         if (this.status === mismatch) { this.status = 'Select a subtitle phrase to begin.'; this.render(); }
       }
     }
-    const appearance = this.appearancePreview ?? this.settings.appearance;
-    if (cue && appearance.showTranslation && this.secondaryId !== null) this.host.ownSecondary();
+    const showSecondary = sourceReady && this.secondaryId !== null && this.secondaryId !== 0;
+    if (showSecondary) this.host.ownSecondary();
     else this.host.restoreSecondary();
-    const translation = cue && appearance.showTranslation && this.secondaryId !== null ? this.host.secondaryText : '';
+    const translation = showSecondary ? this.host.secondaryText : '';
     if (force || translation !== this.translationText) {
       this.translationText = translation;
       this.host.toOverlay('translation', translation);
