@@ -11,8 +11,9 @@ const context: ContextSnapshot = {
 test('initial, follow-up, retry, and stale response ownership', () => {
   const conversation = new Conversation(3, context);
   const first = conversation.beginInitial();
-  expect(first.messages[1].content).toContain('Natural meaning');
+  expect(first.messages[0].content).toContain('Natural meaning');
   expect(first.messages[1].content).toContain('Future line');
+  expect(JSON.parse(first.messages[1].content).task).toBeUndefined();
   expect(conversation.delta(first.owner, 'Natural meaning: such')).toBe(true);
   expect(conversation.complete(first.owner)).toBe(true);
   const followup = conversation.followUp('Why is bir used here?');

@@ -8,15 +8,19 @@ for (const item of evalCases) {
     expect(context.selection.exactText).toBe(item.selected);
     expect(context.selection.cueText.slice(context.selection.rangeStartUtf16, context.selection.rangeEndUtf16)).toBe(item.selected);
     const source = JSON.parse(messages[1].content) as {
+      sourceLanguage: string; explanationLanguage: string;
       selected: string; sourceCue: string; before: string[]; after: string[]; secondary: string[];
     };
-    expect(source).toMatchObject({ selected: item.selected, sourceCue: item.cue,
+    expect(source).toMatchObject({ sourceLanguage: 'Turkish', explanationLanguage: 'English',
+      selected: item.selected, sourceCue: item.cue,
       before: item.before ?? [], after: item.after ?? [], secondary: item.secondary ?? [] });
+    expect(source).not.toHaveProperty('task');
     expect(messages[0].role).toBe('system');
     expect(messages[0].content).not.toContain(item.cue);
+    expect(messages[0].content).toContain('do not attribute their words or actions to that line');
     if (item.question) {
       expect(messages.map(message => message.role)).toEqual(['system', 'user', 'assistant', 'user']);
-      expect(messages[0].content).toContain('Answer follow-up questions directly');
+      expect(messages[0].content).toContain('Answer the latest user follow-up directly');
       expect(messages.at(-1)?.content).toBe(item.question);
       expect(messages[2].content).toBe(item.priorAnswer!);
     } else expect(messages).toHaveLength(2);

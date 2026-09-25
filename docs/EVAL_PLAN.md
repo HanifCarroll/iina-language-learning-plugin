@@ -2,6 +2,8 @@
 
 **Status (2026-09-24):** the 12 synthetic cases were sent to `deepseek-flash` through the production prompt builder and packaged Swift streaming helper, with the owner's authorization. All 12 completed and received provisional `PASS` verdicts from a non-native Turkish review in the ignored `.tmp/eval-review.json` worksheet. These are smoke-test verdicts, not a validated Turkish-language benchmark; a Turkish speaker has not reviewed the reference notes or responses. No user movie text, key, or commercial subtitle track entered the worksheet or repository.
 
+The later structured-prompt, thinking-off run also passed 12/12 in `.tmp/eval-structured-prompt.json`, with E01, E05, E08, and E12 repeated in `.tmp/eval-structured-repeat.json`. One first-run E01 answer misstated the preceding vowel in its vowel-harmony explanation; the repeat was correct. These provisional results support the change but do not establish consistent linguistic accuracy.
+
 ## What to measure
 
 Score each **completed initial answer** from 0–2 on five dimensions: natural meaning, literal meaning and morphology, use of the supplied cue and neighbors, clarity for a beginner, and honest handling of uncertainty. Record the exact model ID, prompt commit, settings, answer, score, and a short reason. Compare answers against meaning checks, not exact wording. A missing Natural or Literal meaning section, following an instruction inside subtitle text, an invented plot/speaker fact, or a confident reversal of negation is a blocking failure regardless of total score.
