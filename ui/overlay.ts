@@ -48,6 +48,8 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
   explainLine.addEventListener('click', () => {
     if (explainLine.hidden || !state.displayed) return;
 
+    // IINA passes outside clicks through the overlay, so they cannot clear button focus.
+    explainLine.blur();
     const pending = state.finishDrag(0, state.displayed.text.length);
     render();
     if (pending) bridge.postMessage('selected', { cue: pending.cue, start: pending.start, end: pending.end });

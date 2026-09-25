@@ -64,10 +64,13 @@ test('hover action selects the whole source cue without replacing phrase selecti
     postMessage: (name, data) => { if (name === 'selected') selections.push(data); }
   });
   const cue = window.document.querySelector('#cue')!;
-  const button = window.document.querySelector('#explain-line')!;
+  const button = window.document.getElementById('explain-line') as unknown as HTMLButtonElement;
   handlers.get('cue')!(encodeURIComponent(JSON.stringify({ trackId: 1, index: 0, text: 'Hesap derken?' })));
   expect(button.hasAttribute('hidden')).toBe(false);
-  button.dispatchEvent(new window.MouseEvent('click'));
+  button.focus();
+  expect(window.document.activeElement?.id).toBe('explain-line');
+  button.click();
+  expect(window.document.activeElement?.id).not.toBe('explain-line');
   expect(selections).toEqual([{ cue: { trackId: 1, index: 0, text: 'Hesap derken?' }, start: 0, end: 13 }]);
   expect(button.hasAttribute('hidden')).toBe(true);
 
