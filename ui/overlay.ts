@@ -5,6 +5,7 @@ declare const iina: Bridge;
 
 export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
   const cue = doc.querySelector<HTMLElement>('#cue')!;
+  const explainLine = doc.querySelector<HTMLButtonElement>('#explain-line')!;
   const translation = doc.querySelector<HTMLElement>('#translation');
   const wrap = doc.querySelector<HTMLElement>('#wrap');
   const state = new SelectionState();
@@ -12,6 +13,7 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
 
   function render(): void {
     if (cue.textContent !== (state.displayed?.text ?? '')) cue.textContent = state.displayed?.text ?? '';
+    explainLine.hidden = !state.displayed?.text.trim() || state.dragging || !!state.pending;
   }
 
   function dismiss(): void {
@@ -40,9 +42,16 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
     captureTimer = setTimeout(() => { captureTimer = null; capture(); }, 80);
   }
 
-  cue.addEventListener('mousedown', () => state.beginDrag());
+  cue.addEventListener('mousedown', () => { state.beginDrag(); render(); });
   cue.addEventListener('mouseup', scheduleCapture);
   cue.addEventListener('dblclick', scheduleCapture);
+  explainLine.addEventListener('click', () => {
+    if (explainLine.hidden || !state.displayed) return;
+
+    const pending = state.finishDrag(0, state.displayed.text.length);
+    render();
+    if (pending) bridge.postMessage('selected', { cue: pending.cue, start: pending.start, end: pending.end });
+  });
   bridge.onMessage('cue', encoded => {
     try {
       const next: unknown = JSON.parse(decodeURIComponent(encoded));
