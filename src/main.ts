@@ -549,17 +549,16 @@ export class Session {
 
   private syncTracks(): void {
     // 1. Detect track changes, including titles and external-file availability.
-    const signature = JSON.stringify([
-      this.host.sourceId,
-      this.host.secondaryId,
+    const signature = JSON.stringify(
       this.host.subtitleTracks.map((track) => [
         track.id,
         track.formattedTitle,
         track.title,
         track.isExternal
       ])
-    ]);
-    let changed = signature !== this.subtitleTrackState;
+    );
+    const trackListChanged = signature !== this.subtitleTrackState;
+    let changed = trackListChanged;
     this.subtitleTrackState = signature;
     if (!this.overlayEnabled || !this.mediaUrl || this.ended) {
       if (changed) {
@@ -571,7 +570,12 @@ export class Session {
 
     // 2. Reload source cues and release any old subtitle selection.
     const sourceId = this.host.sourceId;
-    if (sourceId !== this.sourceId) {
+    const sourceTrack = this.host.externalTrack(sourceId);
+    if (
+      sourceId !== this.sourceId ||
+      trackListChanged ||
+      (sourceTrack !== null && this.source === null)
+    ) {
       changed = true;
       this.host.restorePrimary();
       this.host.restoreSecondary();
@@ -581,8 +585,7 @@ export class Session {
       }
       this.sourceId = sourceId;
       this.source = null;
-      const track = this.host.externalTrack(sourceId);
-      if (track && sourceId !== null) {
+      if (sourceTrack && sourceId !== null) {
         try {
           this.source = this.readCues(sourceId);
           this.status = 'Select a subtitle phrase to begin.';
@@ -596,7 +599,7 @@ export class Session {
 
     // 3. Reload optional secondary context and publish changed track state.
     const secondaryId = this.host.secondaryId;
-    if (secondaryId !== this.secondaryId) {
+    if (secondaryId !== this.secondaryId || trackListChanged) {
       changed = true;
       this.secondaryId = secondaryId;
       this.secondary = [];

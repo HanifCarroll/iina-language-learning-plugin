@@ -150,6 +150,12 @@ function fakePlayer(alreadyLoaded = false) {
       getFlag: (name: string) => props.get(name) ?? false,
       set: (name: string, value: unknown) => {
         props.set(name, value);
+        if (name === 'sid') {
+          raw.core.subtitle.id = value as number;
+        }
+        if (name === 'secondary-sid') {
+          raw.core.subtitle.secondID = value as number;
+        }
       }
     },
     overlay: {
@@ -344,10 +350,12 @@ test('Plugin menu loads an SRT and selects source and secondary tracks in this w
   secondaryMenu.items.at(-1)!.action?.();
 
   expect(player.raw.core.subtitle.secondID).toBe(3);
+  expect(player.props.get('secondary-sid')).toBe(3);
 
   sourceMenu.items[0].action?.();
 
   expect(player.raw.core.subtitle.id).toBe(0);
+  expect(player.props.get('sid')).toBe(0);
 
   player.events.get('iina.menu-update')!();
 
@@ -423,6 +431,38 @@ test('sidebar track controls share IINA state with the menu and reject stale or 
 
   player.close();
   other.close();
+});
+
+test('a subtitle file that becomes readable after a media switch is retried', () => {
+  const player = fakePlayer();
+  const readTrack = player.raw.file.read;
+  player.raw.file.read = () => {
+    throw new Error('Cannot read file');
+  };
+  player.status.url = 'file:///replacement.mp4';
+  player.events.get('mpv.file-loaded')!();
+
+  expect(player.states.at(-1).status).toBe('Cannot read file');
+
+  player.raw.file.read = readTrack;
+  player.tick();
+
+  expect(player.states.at(-1).status).toBe('Select a subtitle phrase to begin.');
+  expect(player.props.get('sub-visibility')).toBe(false);
+
+  player.raw.file.read = (path: string) =>
+    path === '@sub/1' ? '1\n00:00:00,000 --> 00:00:02,000\nYeni söz' : secondary;
+  player.raw.core.subtitle.tracks[0].title = 'replacement source';
+  player.props.set('sub-text', 'Yeni söz');
+  player.tick();
+
+  expect(player.overlayPayloads.filter((item) => item.name === 'cue').at(-1)?.value).toEqual({
+    trackId: 1,
+    index: 0,
+    text: 'Yeni söz'
+  });
+
+  player.close();
 });
 
 test('a file picked for an earlier movie is not loaded into replacement media', async () => {
