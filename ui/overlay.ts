@@ -1,15 +1,32 @@
 import { SelectionState, type DisplayCue } from '../src/selection';
 
-type Bridge = { onMessage(name: string, callback: (data: string) => void): void; postMessage(name: string, data: unknown): void };
+type Bridge = { onMessage(name: string, callback: (data: string) => void): void; postMessage(name: string, data: unknown): void;
+  _hitTest?: (x: number, y: number) => boolean };
 declare const iina: Bridge;
 
 export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
   const cue = doc.querySelector<HTMLElement>('#cue')!;
   const explainLine = doc.querySelector<HTMLButtonElement>('#explain-line')!;
+  const sourceLine = doc.querySelector<HTMLElement>('#source-line')!;
   const translation = doc.querySelector<HTMLElement>('#translation');
   const wrap = doc.querySelector<HTMLElement>('#wrap');
   const state = new SelectionState();
   let captureTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function installHoverTracking(): void {
+    const nativeHitTest = bridge._hitTest;
+    if (!nativeHitTest) return;
+
+    // IINA passes movement outside clickable elements to the player, leaving WebView :hover stale.
+    bridge._hitTest = (x, y) => {
+      const clickable = nativeHitTest(x, y);
+      sourceLine.dataset.hovered = String(sourceLine.contains(doc.elementFromPoint(x, y)));
+      return clickable;
+    };
+  }
+
+  if (doc.readyState === 'complete') installHoverTracking();
+  else doc.defaultView?.addEventListener('load', installHoverTracking, { once: true });
 
   function render(): void {
     if (cue.textContent !== (state.displayed?.text ?? '')) cue.textContent = state.displayed?.text ?? '';
@@ -20,6 +37,7 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
     if (captureTimer) clearTimeout(captureTimer);
     captureTimer = null;
     state.dismiss();
+    sourceLine.dataset.hovered = 'false';
     doc.getSelection()?.removeAllRanges();
     render();
     bridge.postMessage('selectionCleared', {});
@@ -57,16 +75,17 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
   bridge.onMessage('cue', encoded => {
     try {
       const next: unknown = JSON.parse(decodeURIComponent(encoded));
-      if (next === null) { state.cueChanged(null); render(); return; }
+      if (next === null) { state.cueChanged(null); sourceLine.dataset.hovered = 'false'; render(); return; }
       if (typeof next !== 'object') return;
       const item = next as DisplayCue;
       if (!Number.isInteger(item.trackId) || !Number.isInteger(item.index) ||
         typeof item.text !== 'string' || item.text.length > 4_000) return;
       state.cueChanged(item);
+      sourceLine.dataset.hovered = 'false';
       render();
     } catch { /* malformed host data is ignored */ }
   });
-  bridge.onMessage('seek', () => { state.seek(); doc.getSelection()?.removeAllRanges(); render(); });
+  bridge.onMessage('seek', () => { state.seek(); sourceLine.dataset.hovered = 'false'; doc.getSelection()?.removeAllRanges(); render(); });
   bridge.onMessage('clear', dismiss);
   bridge.onMessage('subtitleOrder', encoded => {
     if (!wrap) return;

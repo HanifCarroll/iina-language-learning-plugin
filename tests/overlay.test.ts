@@ -85,3 +85,29 @@ test('hover action selects the whole source cue without replacing phrase selecti
   expect(selections.at(-1)).toEqual({ cue: { trackId: 1, index: 0, text: 'Hesap derken?' }, start: 0, end: 5 });
   window.happyDOM.abort();
 });
+
+test('IINA hit tests clear hover when movement passes through to the player', () => {
+  const window = new Window();
+  (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;
+  window.document.body.innerHTML = '<div id="wrap"><div id="source-line"><div id="cue"></div><button id="explain-line" hidden>Explain line</button></div></div>';
+  const handlers = new Map<string, (data: string) => void>();
+  const sourceLine = window.document.getElementById('source-line')!;
+  const cue = window.document.getElementById('cue')!;
+  let pointerTarget: unknown = cue;
+  Object.defineProperty(window.document, 'elementFromPoint', { value: () => pointerTarget });
+  const bridge = {
+    onMessage: (name: string, callback: (data: string) => void) => { handlers.set(name, callback); },
+    postMessage: () => {},
+    _hitTest: (x: number, _y: number) => x === 1
+  };
+  mountOverlay(window.document as unknown as Document, bridge);
+  window.dispatchEvent(new window.Event('load'));
+  handlers.get('cue')!(encodeURIComponent(JSON.stringify({ trackId: 1, index: 0, text: 'Hesap derken?' })));
+
+  expect(bridge._hitTest(1, 1)).toBe(true);
+  expect(sourceLine.getAttribute('data-hovered')).toBe('true');
+  pointerTarget = window.document.body;
+  expect(bridge._hitTest(2, 2)).toBe(false);
+  expect(sourceLine.getAttribute('data-hovered')).toBe('false');
+  window.happyDOM.abort();
+});
