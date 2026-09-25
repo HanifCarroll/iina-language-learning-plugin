@@ -45,7 +45,11 @@ export const evalCases: EvalCase[] = [
   { id: 'E12', title: 'Frozen-context follow-up', selected: 'öyle bir insan', cue: 'Ben öyle bir insan mıyım?',
     question: 'Why is bir used here?',
     priorAnswer: '**Natural meaning**\nAm I that kind of person?\n\n**Literal meaning**\nAm I such a person? The phrase bir insan means a person.',
-    checks: { direct: 'Answers the bir question directly.', original: 'Uses the original phrase and cue, not the current playback cue.', concise: 'Does not repeat the whole initial lesson.' } }
+    checks: { direct: 'Answers the bir question directly.', original: 'Uses the original phrase and cue, not the current playback cue.', concise: 'Does not repeat the whole initial lesson.' } },
+  { id: 'E13', title: 'Elliptical literal gloss', selected: 'Hesap derken?', cue: 'Hesap derken?',
+    checks: { natural: 'Natural meaning explains the implied question about account.',
+      literal: 'Literal meaning gives only a close gloss of hesap and derken, without restating the implied natural question.',
+      breakdown: 'Breakdown explains the omitted meaning separately from the literal gloss.' } }
 ];
 
 const cue = (text: string, index: number): Cue => ({ index, startMs: index * 2_000, endMs: index * 2_000 + 1_800, text });
