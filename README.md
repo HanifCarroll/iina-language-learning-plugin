@@ -36,6 +36,8 @@ Each subtitle file is limited to 8 MiB and 50,000 cues; each cue or selection to
 
 ## Development and evidence
 
-`bun run release:check` runs the TypeScript and DOM tests, typechecks, compiles the Swift helper, packages the plugin, checks the archive, and exercises the helper against local controlled endpoints. [The acceptance report](ACCEPTANCE_REPORT.md) distinguishes automated, installed-IINA, and still-outstanding checks. The [specification](docs/SPEC.md) defines behavior; the [evaluation plan](docs/EVAL_PLAN.md) describes the synthetic language cases. No real provider key or user media is committed.
+`bun run format` formats `src/`, `tests/`, and `ui/` with Oxfmt. `bun run lint` checks TypeScript with Oxlint, including explicit braces and no nested ternaries.
+
+`bun run release:check` checks lint and formatting, runs the TypeScript and DOM tests, typechecks, compiles the Swift helper, packages the plugin, checks the archive, and exercises the helper against local controlled endpoints. [The acceptance report](ACCEPTANCE_REPORT.md) distinguishes automated, installed-IINA, and still-outstanding checks. The [specification](docs/SPEC.md) defines behavior; the [evaluation plan](docs/EVAL_PLAN.md) describes the synthetic language cases. No real provider key or user media is committed.
 
 The source is MIT licensed. The package includes notices for `markdown-it` and its bundled dependencies. The ignored `.references/` clones were used for research; no substantial reference implementation was copied. See [the release checklist](docs/RELEASE.md) before publishing or proposing an IINA community-list entry.

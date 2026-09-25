@@ -2,6 +2,8 @@
 set -eu
 cd "$(dirname "$0")/.."
 
+bun run lint
+bun run format:check
 bun test
 bun run package
 

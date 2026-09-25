@@ -1,5 +1,14 @@
-export type DisplayCue = { trackId: number; index: number; text: string };
-export type PendingSelection = { cue: DisplayCue; start: number; end: number; text: string };
+export type DisplayCue = {
+  trackId: number;
+  index: number;
+  text: string;
+};
+export type PendingSelection = {
+  cue: DisplayCue;
+  start: number;
+  end: number;
+  text: string;
+};
 
 export class SelectionState {
   current: DisplayCue | null = null;
@@ -9,25 +18,45 @@ export class SelectionState {
 
   cueChanged(cue: DisplayCue | null): void {
     this.current = cue;
-    if (!this.dragging && !this.pending) this.displayed = cue;
+    if (!this.dragging && !this.pending) {
+      this.displayed = cue;
+    }
   }
 
   beginDrag(): void {
-    if (this.displayed) this.dragging = true;
+    if (this.displayed) {
+      this.dragging = true;
+    }
   }
 
   finishDrag(start: number, end: number): PendingSelection | null {
+    // 1. Accept only a nonempty range inside the displayed cue.
     this.dragging = false;
     const cue = this.displayed;
-    if (cue && Number.isInteger(start) && Number.isInteger(end) &&
-      start >= 0 && end > start && end <= cue.text.length) {
+    if (
+      cue &&
+      Number.isInteger(start) &&
+      Number.isInteger(end) &&
+      start >= 0 &&
+      end > start &&
+      end <= cue.text.length
+    ) {
       const text = cue.text.slice(start, end);
       if (text.trim() && text.length <= 4_000) {
-        this.pending = { cue, start, end, text };
+        this.pending = {
+          cue,
+          start,
+          end,
+          text
+        };
+
         return this.pending;
       }
     }
+
+    // 2. Release the frozen cue when the selection is invalid.
     this.dismiss();
+
     return null;
   }
 

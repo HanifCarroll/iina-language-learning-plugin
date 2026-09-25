@@ -7,39 +7,84 @@ import { evalCases, requestFor } from './eval_cases';
 // A deliberate local-only command: the key stays in memory and a private FIFO.
 // Never print it, place it in argv/environment, or write it to the worksheet.
 const mock = Bun.argv[2] === '--mock';
-if (!mock && Bun.argv[2] !== '--live') throw new Error('Pass --mock for local transport or --live for billable synthetic eval requests');
+if (!mock && Bun.argv[2] !== '--live') {
+  throw new Error('Pass --mock for local transport or --live for billable synthetic eval requests');
+}
 
 const service = 'io.github.hanifcarroll.iina-language-learning - api:https://api.deepseek.com';
-const endpoint = mock ? 'http://127.0.0.1:47891/chat/completions' : 'https://api.deepseek.com/chat/completions';
+const endpoint = mock
+  ? 'http://127.0.0.1:47891/chat/completions'
+  : 'https://api.deepseek.com/chat/completions';
 const model = mock ? 'synthetic' : 'deepseek-flash';
 const helper = 'dist/io.github.hanifcarroll.iina-language-learning.iinaplugin/native/stream-helper';
 const worksheetPath = mock ? '.tmp/eval-collector-mock.json' : '.tmp/eval-review.json';
-const worksheet = (mock ? {
-  run: { model, promptCommit: '', reviewer: '' },
-  results: Object.fromEntries(evalCases.map(item => [item.id, { status: 'not_run', answer: '' }]))
-} : JSON.parse(await readFile(worksheetPath, 'utf8'))) as {
-  run: { model: string; promptCommit: string; reviewer: string };
-  results: Record<string, { status: string; answer: string }>;
+const worksheet = (
+  mock
+    ? {
+        run: {
+          model,
+          promptCommit: '',
+          reviewer: ''
+        },
+        results: Object.fromEntries(
+          evalCases.map((item) => [item.id, { status: 'not_run', answer: '' }])
+        )
+      }
+    : JSON.parse(await readFile(worksheetPath, 'utf8'))
+) as {
+  run: {
+    model: string;
+    promptCommit: string;
+    reviewer: string;
+  };
+  results: Record<
+    string,
+    {
+      status: string;
+      answer: string;
+    }
+  >;
 };
-if (evalCases.some(item => !['not_run', 'complete'].includes(worksheet.results[item.id]?.status))) {
+if (
+  evalCases.some((item) => !['not_run', 'complete'].includes(worksheet.results[item.id]?.status))
+) {
   throw new Error('The eval worksheet has an incomplete or failed case; review it before retrying');
 }
 
 async function readKey(): Promise<string> {
-  const keyProcess = spawn('security', ['find-generic-password', '-s', service, '-a', 'api-key', '-w'],
-    { stdio: ['ignore', 'pipe', 'ignore'] });
+  // 1. Read the endpoint-bound Keychain value into memory only.
+  const keyProcess = spawn(
+    'security',
+    ['find-generic-password', '-s', service, '-a', 'api-key', '-w'],
+    { stdio: ['ignore', 'pipe', 'ignore'] }
+  );
   const keyClosed = once(keyProcess, 'close');
   const keyChunks: Buffer[] = [];
-  for await (const chunk of keyProcess.stdout) keyChunks.push(Buffer.from(chunk));
-  const [keyExit] = await keyClosed as [number];
-  if (keyExit !== 0) throw new Error('One-time Keychain read was not granted');
+  for await (const chunk of keyProcess.stdout) {
+    keyChunks.push(Buffer.from(chunk));
+  }
+
+  // 2. Reject denied access and malformed key values without logging them.
+  const [keyExit] = (await keyClosed) as [number];
+  if (keyExit !== 0) {
+    throw new Error('One-time Keychain read was not granted');
+  }
+
   const key = Buffer.concat(keyChunks).toString('utf8').replace(/\n$/, '');
-  if (!key || key.includes('\n') || key.includes('\r')) throw new Error('Saved API key is invalid');
+  if (!key || key.includes('\n') || key.includes('\r')) {
+    throw new Error('Saved API key is invalid');
+  }
+
   return key;
 }
 const key = mock ? 'fixture-eval' : await readKey();
 
-async function runCase(messages: unknown): Promise<{ status: 'complete' | 'incomplete' | 'failed'; answer: string; error?: string }> {
+async function runCase(messages: unknown): Promise<{
+  status: 'complete' | 'incomplete' | 'failed';
+  answer: string;
+  error?: string;
+}> {
+  // 1. Start one isolated helper with private pipes and a watchdog.
   const parent = await mkdtemp('/tmp/iina-synthetic-eval-');
   const directory = `${parent}/request`;
   const child = spawn(helper, [directory], { stdio: ['ignore', 'pipe', 'ignore'] });
@@ -51,18 +96,31 @@ async function runCase(messages: unknown): Promise<{ status: 'complete' | 'incom
   let terminal: 'complete' | 'incomplete' | 'failed' | null = null;
   let failure: string | undefined;
   try {
+    // 2. Send the authenticated payload only after READY, then collect frames.
     for await (const line of lines) {
       if (line === 'READY') {
         control = await open(`${directory}/control`, 'w');
         const input = await open(`${directory}/request`, 'w');
         try {
-          await input.writeFile(JSON.stringify({ url: endpoint, key,
-            body: { model, stream: true, messages } }));
-        } finally { await input.close(); }
+          await input.writeFile(
+            JSON.stringify({
+              url: endpoint,
+              key,
+              body: {
+                model,
+                stream: true,
+                messages
+              }
+            })
+          );
+        } finally {
+          await input.close();
+        }
       } else if (line.startsWith('DELTA ')) {
         answer += Buffer.from(line.slice(6), 'base64').toString('utf8');
-      } else if (line === 'DONE') terminal = 'complete';
-      else if (line.startsWith('ERROR ') || line.startsWith('CANCELLED ')) {
+      } else if (line === 'DONE') {
+        terminal = 'complete';
+      } else if (line.startsWith('ERROR ') || line.startsWith('CANCELLED ')) {
         terminal = answer ? 'incomplete' : 'failed';
         failure = line;
       }
@@ -73,19 +131,30 @@ async function runCase(messages: unknown): Promise<{ status: 'complete' | 'incom
     await closed;
     throw error;
   } finally {
+    // 3. Close pipes and remove temporary request state on every exit.
     clearTimeout(watchdog);
     await control?.close();
     await rm(parent, { recursive: true, force: true });
   }
-  return { status: terminal ?? (answer ? 'incomplete' : 'failed'), answer, error: failure };
+
+  return {
+    status: terminal ?? (answer ? 'incomplete' : 'failed'),
+    answer,
+    error: failure
+  };
 }
 
 for (const item of evalCases) {
-  if (worksheet.results[item.id].status === 'complete') continue;
+  if (worksheet.results[item.id].status === 'complete') {
+    continue;
+  }
+
   const result = await runCase(requestFor(item).messages);
   worksheet.results[item.id].status = result.status;
   worksheet.results[item.id].answer = result.answer;
   await writeFile(worksheetPath, JSON.stringify(worksheet, null, 2) + '\n');
   console.log(`${item.id} ${result.status}${result.error ? ` ${result.error}` : ''}`);
-  if (result.status !== 'complete') break;
+  if (result.status !== 'complete') {
+    break;
+  }
 }

@@ -1,97 +1,147 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><link rel="stylesheet" href="sidebar.css"></head>
-<body>
-<main>
-  <header><h1>Neden</h1><button id="close" type="button" aria-label="Close sidebar" title="Close sidebar">×</button></header>
-  <nav aria-label="Neden views">
-    <button id="chatTab" type="button">Chat</button>
-    <button id="subtitlesTab" type="button">Subtitles</button>
-    <button id="aiTab" type="button">AI settings</button>
-  </nav>
-  <p id="status" role="status">Select a subtitle phrase to begin.</p>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="sidebar.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Neden</h1>
+        <button id="close" type="button" aria-label="Close sidebar" title="Close sidebar">×</button>
+      </header>
+      <nav aria-label="Neden views">
+        <button id="chatTab" type="button">Chat</button>
+        <button id="subtitlesTab" type="button">Subtitles</button>
+        <button id="aiTab" type="button">AI settings</button>
+      </nav>
+      <p id="status" role="status">Select a subtitle phrase to begin.</p>
 
-  <section id="chatView" aria-label="Chat">
-    <section id="conversation" hidden>
-      <div class="source">
-        <span class="eyebrow">Selected phrase</span><strong id="phrase"></strong>
-        <button id="replay" type="button" hidden>Replay line</button>
-        <details id="fullCue"><summary>Full subtitle line</summary><p id="sourceCue"></p></details>
-      </div>
-      <div id="turns" aria-live="polite" aria-label="Explanation and follow-ups"></div>
-      <div class="composer">
-        <label for="question">Ask a follow-up</label>
-        <textarea id="question" rows="1" maxlength="2000" placeholder="What would you like to know?"></textarea>
-        <div class="row composer-actions">
-          <button id="stop" type="button" hidden>Stop generating</button>
-          <button id="retry" type="button" hidden>Retry</button>
-          <button id="send" type="button">Send</button>
+      <section id="chatView" aria-label="Chat">
+        <section id="conversation" hidden>
+          <div class="source">
+            <span class="eyebrow">Selected phrase</span><strong id="phrase"></strong>
+            <button id="replay" type="button" hidden>Replay line</button>
+            <details id="fullCue">
+              <summary>Full subtitle line</summary>
+              <p id="sourceCue"></p>
+            </details>
+          </div>
+          <div id="turns" aria-live="polite" aria-label="Explanation and follow-ups"></div>
+          <div class="composer">
+            <label for="question">Ask a follow-up</label>
+            <textarea
+              id="question"
+              rows="1"
+              maxlength="2000"
+              placeholder="What would you like to know?"
+            ></textarea>
+            <div class="row composer-actions">
+              <button id="stop" type="button" hidden>Stop generating</button>
+              <button id="retry" type="button" hidden>Retry</button>
+              <button id="send" type="button">Send</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section id="subtitlesView" aria-label="Subtitles" hidden>
+        <h2>Subtitle tracks</h2>
+        <div class="form-group">
+          <label for="sourceTrack">Source subtitle</label>
+          <select id="sourceTrack"></select>
+          <p class="hint">Choose an external SRT or VTT track to explain.</p>
         </div>
-      </div>
-    </section>
-  </section>
+        <div class="form-group">
+          <label for="secondaryTrack">Secondary subtitle</label>
+          <select id="secondaryTrack"></select>
+        </div>
+        <div class="subtitle-order-row">
+          <p id="subtitleOrder" class="hint">Secondary above source</p>
+          <button id="swapSubtitleOrder" class="quiet-button" type="button">Swap positions</button>
+        </div>
+        <button id="addSubtitleFile" type="button">Add SRT/VTT file…</button>
 
-  <section id="subtitlesView" aria-label="Subtitles" hidden>
-    <h2>Subtitle tracks</h2>
-    <div class="form-group">
-      <label for="sourceTrack">Source subtitle</label>
-      <select id="sourceTrack"></select>
-      <p class="hint">Choose an external SRT or VTT track to explain.</p>
-    </div>
-    <div class="form-group">
-      <label for="secondaryTrack">Secondary subtitle</label>
-      <select id="secondaryTrack"></select>
-    </div>
-    <div class="subtitle-order-row">
-      <p id="subtitleOrder" class="hint">Secondary above source</p>
-      <button id="swapSubtitleOrder" class="quiet-button" type="button">Swap positions</button>
-    </div>
-    <button id="addSubtitleFile" type="button">Add SRT/VTT file…</button>
+        <details id="appearanceControls">
+          <summary>Appearance</summary>
+          <p class="notice">
+            Changes preview on the video. Apply saves them; leaving this view restores the saved
+            appearance.
+          </p>
+          <label>Source size (px)<input id="sourceSize" type="number" min="16" max="56" /></label>
+          <label>Source color<input id="sourceColor" type="color" /></label>
+          <label
+            >Subtitle stack distance from bottom (%)<input
+              id="sourceBottom"
+              type="number"
+              min="4"
+              max="35"
+          /></label>
+          <label
+            >Secondary size (px)<input id="translationSize" type="number" min="16" max="56"
+          /></label>
+          <label>Secondary color<input id="translationColor" type="color" /></label>
+          <label
+            >Gap between subtitles (px)<input id="translationGap" type="number" min="0" max="80"
+          /></label>
+          <button id="saveAppearance" type="button">Apply appearance</button>
+        </details>
 
-    <details id="appearanceControls">
-      <summary>Appearance</summary>
-      <p class="notice">Changes preview on the video. Apply saves them; leaving this view restores the saved appearance.</p>
-      <label>Source size (px)<input id="sourceSize" type="number" min="16" max="56"></label>
-      <label>Source color<input id="sourceColor" type="color"></label>
-      <label>Subtitle stack distance from bottom (%)<input id="sourceBottom" type="number" min="4" max="35"></label>
-      <label>Secondary size (px)<input id="translationSize" type="number" min="16" max="56"></label>
-      <label>Secondary color<input id="translationColor" type="color"></label>
-      <label>Gap between subtitles (px)<input id="translationGap" type="number" min="0" max="80"></label>
-      <button id="saveAppearance" type="button">Apply appearance</button>
-    </details>
+        <details class="advanced">
+          <summary>Overlay control</summary>
+          <label class="checkbox"
+            ><input id="overlayEnabled" type="checkbox" role="switch" />Selectable subtitle
+            overlay</label
+          >
+          <p class="notice">
+            Turning this off stops any response, clears the chat, resumes eligible playback, and
+            restores native subtitles. Turn it off before disabling Neden in IINA.
+          </p>
+        </details>
+      </section>
 
-    <details class="advanced"><summary>Overlay control</summary>
-      <label class="checkbox"><input id="overlayEnabled" type="checkbox" role="switch">Selectable subtitle overlay</label>
-      <p class="notice">Turning this off stops any response, clears the chat, resumes eligible playback, and restores native subtitles. Turn it off before disabling Neden in IINA.</p>
-    </details>
-  </section>
-
-  <section id="aiView" aria-label="AI settings" hidden>
-    <section class="settings-group" aria-labelledby="connectionHeading">
-      <h2 id="connectionHeading">Connection</h2>
-      <label>API base URL<input id="endpoint" type="url" autocomplete="off" placeholder="https://provider.example/v1"></label>
-      <p id="requestUrl" class="hint"></p>
-      <label>Model<input id="model" type="text" autocomplete="off"></label>
-    </section>
-    <section class="settings-group" aria-labelledby="languagesHeading">
-      <h2 id="languagesHeading">Languages</h2>
-      <label>Source language<input id="sourceLanguage" type="text"></label>
-      <label>Explanation language<input id="explanationLanguage" type="text"></label>
-      <label class="checkbox"><input id="includeSecondary" type="checkbox">Include secondary subtitle text in AI context</label>
-    </section>
-    <section class="settings-group" aria-labelledby="keyHeading">
-      <h2 id="keyHeading">API key</h2>
-      <label class="checkbox"><input id="noKeyRequired" type="checkbox">This endpoint needs no API key</label>
-      <label for="apiKey">Save or replace key</label>
-      <input id="apiKey" type="password" autocomplete="new-password">
-      <p id="keyStatus" class="hint"></p>
-    </section>
-    <button id="saveSettings" type="button">Save AI settings</button>
-    <details class="advanced"><summary>How requests work</summary>
-      <p class="notice">Selecting subtitle text sends the phrase, nearby cues, optional secondary text, and chat to this endpoint. The provider may charge for requests. The packaged helper makes network requests outside IINA's HTTP domain permission.</p>
-    </details>
-  </section>
-</main>
-<script src="sidebar.js"></script>
-</body>
+      <section id="aiView" aria-label="AI settings" hidden>
+        <section class="settings-group" aria-labelledby="connectionHeading">
+          <h2 id="connectionHeading">Connection</h2>
+          <label
+            >API base URL<input
+              id="endpoint"
+              type="url"
+              autocomplete="off"
+              placeholder="https://provider.example/v1"
+          /></label>
+          <p id="requestUrl" class="hint"></p>
+          <label>Model<input id="model" type="text" autocomplete="off" /></label>
+        </section>
+        <section class="settings-group" aria-labelledby="languagesHeading">
+          <h2 id="languagesHeading">Languages</h2>
+          <label>Source language<input id="sourceLanguage" type="text" /></label>
+          <label>Explanation language<input id="explanationLanguage" type="text" /></label>
+          <label class="checkbox"
+            ><input id="includeSecondary" type="checkbox" />Include secondary subtitle text in AI
+            context</label
+          >
+        </section>
+        <section class="settings-group" aria-labelledby="keyHeading">
+          <h2 id="keyHeading">API key</h2>
+          <label class="checkbox"
+            ><input id="noKeyRequired" type="checkbox" />This endpoint needs no API key</label
+          >
+          <label for="apiKey">Save or replace key</label>
+          <input id="apiKey" type="password" autocomplete="new-password" />
+          <p id="keyStatus" class="hint"></p>
+        </section>
+        <button id="saveSettings" type="button">Save AI settings</button>
+        <details class="advanced">
+          <summary>How requests work</summary>
+          <p class="notice">
+            Selecting subtitle text sends the phrase, nearby cues, optional secondary text, and chat
+            to this endpoint. The provider may charge for requests. The packaged helper makes
+            network requests outside IINA's HTTP domain permission.
+          </p>
+        </details>
+      </section>
+    </main>
+    <script src="sidebar.js"></script>
+  </body>
 </html>

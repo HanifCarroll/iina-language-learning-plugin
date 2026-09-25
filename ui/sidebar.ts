@@ -1,27 +1,67 @@
 import MarkdownIt from 'markdown-it/browser';
 
-type Bridge = { onMessage(name: string, callback: (data: string) => void): void; postMessage(name: string, data: unknown): void };
+type Bridge = {
+  onMessage(name: string, callback: (data: string) => void): void;
+  postMessage(name: string, data: unknown): void;
+};
 declare const iina: Bridge;
 type ViewState = {
-  status: string; open: boolean; conversationId: number | null; overlayEnabled: boolean;
-  replaying: boolean; replayAvailable: boolean; phrase: string; cue: string;
-  mediaEpoch: number; hasMedia: boolean; sourceId: number | null; secondaryId: number | null;
-  subtitleTracks: Array<{ id: number; title: string; isExternal: boolean }>;
-  turns: Array<{ question: string; answer: string; status: string; error?: string }>;
-  settings: { endpoint: string; model: string; sourceLanguage: string; explanationLanguage: string;
-    includeSecondary: boolean; noKeyRequired: boolean; secondaryBelowSource: boolean;
-    hasSavedKey: boolean; requestUrl: string;
-    appearance: { sourceSize: number; sourceColor: string; sourceBottom: number;
-      translationSize: number; translationColor: string; translationGap: number } };
+  status: string;
+  open: boolean;
+  conversationId: number | null;
+  overlayEnabled: boolean;
+  replaying: boolean;
+  replayAvailable: boolean;
+  phrase: string;
+  cue: string;
+  mediaEpoch: number;
+  hasMedia: boolean;
+  sourceId: number | null;
+  secondaryId: number | null;
+  subtitleTracks: Array<{
+    id: number;
+    title: string;
+    isExternal: boolean;
+  }>;
+  turns: Array<{
+    question: string;
+    answer: string;
+    status: string;
+    error?: string;
+  }>;
+  settings: {
+    endpoint: string;
+    model: string;
+    sourceLanguage: string;
+    explanationLanguage: string;
+    includeSecondary: boolean;
+    noKeyRequired: boolean;
+    secondaryBelowSource: boolean;
+    hasSavedKey: boolean;
+    requestUrl: string;
+    appearance: {
+      sourceSize: number;
+      sourceColor: string;
+      sourceBottom: number;
+      translationSize: number;
+      translationColor: string;
+      translationGap: number;
+    };
+  };
 };
 
-const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
+const markdown = new MarkdownIt({
+  html: false,
+  linkify: false,
+  breaks: true
+});
 // Provider text may format explanations, but it cannot create links or load images.
 markdown.renderer.rules.link_open = () => '';
 markdown.renderer.rules.link_close = () => '';
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 
 export function mountSidebar(doc: Document, bridge: Bridge): void {
+  // 1. Bind the sidebar state and retain rendered content between updates.
   const element = <T extends HTMLElement>(id: string): T => doc.getElementById(id) as T;
   const question = element<HTMLTextAreaElement>('question');
   let state: ViewState | null = null;
@@ -36,11 +76,17 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     const atBottom = turns.scrollHeight - turns.scrollTop - turns.clientHeight < 48;
     question.style.height = 'auto';
     question.style.height = `${Math.max(38, Math.min(question.scrollHeight, 68))}px`;
-    if (atBottom) turns.scrollTop = turns.scrollHeight;
+    if (atBottom) {
+      turns.scrollTop = turns.scrollHeight;
+    }
   }
 
   function renderTrackChoices(): void {
-    if (!state) return;
+    // 1. Rebuild track options only when the available tracks change.
+    if (!state) {
+      return;
+    }
+
     const tracks = state.subtitleTracks ?? [];
     const signature = JSON.stringify(tracks);
     if (signature !== renderedTrackOptions) {
@@ -59,6 +105,8 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       }
       renderedTrackOptions = signature;
     }
+
+    // 2. Synchronize selections and disable controls without media.
     element<HTMLSelectElement>('sourceTrack').value = String(state.sourceId ?? 0);
     element<HTMLSelectElement>('secondaryTrack').value = String(state.secondaryId ?? 0);
     element<HTMLSelectElement>('sourceTrack').disabled = !state.hasMedia;
@@ -67,7 +115,10 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   }
 
   function setView(next: typeof view): void {
-    if (view === next) return;
+    if (view === next) {
+      return;
+    }
+
     view = next;
     appearanceDraftActive = false;
     bridge.postMessage('settingsView', { open: next !== 'chat', view: next });
@@ -76,34 +127,74 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   }
 
   function render(): void {
-    if (!state) return;
-    const busy = state.turns.at(-1)?.status === 'streaming';
+    if (!state) {
+      return;
+    }
+
+    // 1. Synchronize navigation and subtitle controls with the player.
+    renderView(state);
+    renderTrackChoices();
+    renderSubtitleOrder(state);
+
+    // 2. Refresh the conversation without replacing stable answers or input drafts.
+    renderConversation(state);
+
+    // 3. Refresh settings only while a settings view is visible.
+    if (view !== 'chat') {
+      renderSettings(state);
+    }
+  }
+
+  function renderView(state: ViewState): void {
     const status = element('status');
     status.textContent = state.status;
     const routineStatus = ['Complete', 'Generating…', 'Preparing explanation…'];
-    status.hidden = routineStatus.includes(state.status) ||
+    status.hidden =
+      routineStatus.includes(state.status) ||
       (view !== 'chat' && state.status === 'Select a subtitle phrase to begin.');
     element<HTMLInputElement>('overlayEnabled').checked = state.overlayEnabled;
-    for (const [tab, name] of [['chatTab', 'chat'], ['subtitlesTab', 'subtitles'], ['aiTab', 'ai']] as const) {
-      if (view === name) element(tab).setAttribute('aria-current', 'page');
-      else element(tab).removeAttribute('aria-current');
+    for (const [tab, name] of [
+      ['chatTab', 'chat'],
+      ['subtitlesTab', 'subtitles'],
+      ['aiTab', 'ai']
+    ] as const) {
+      if (view === name) {
+        element(tab).setAttribute('aria-current', 'page');
+      } else {
+        element(tab).removeAttribute('aria-current');
+      }
     }
     element('chatView').hidden = view !== 'chat';
     element('subtitlesView').hidden = view !== 'subtitles';
     element('aiView').hidden = view !== 'ai';
     element('conversation').hidden = !state.open;
-    renderTrackChoices();
+  }
+
+  function renderSubtitleOrder(state: ViewState): void {
     const sourceId = state.sourceId;
     const secondaryId = state.secondaryId;
-    const sourceTrack = state.subtitleTracks?.find(track => track.id === sourceId);
-    const secondaryTrack = state.subtitleTracks?.find(track => track.id === secondaryId);
+    const sourceTrack = state.subtitleTracks?.find((track) => track.id === sourceId);
+    const secondaryTrack = state.subtitleTracks?.find((track) => track.id === secondaryId);
     const bothTracksSelected = !!sourceTrack && !!secondaryTrack;
-    element('subtitleOrder').textContent = bothTracksSelected
-      ? state.settings.secondaryBelowSource ? 'Source above secondary' : 'Secondary above source'
-      : sourceTrack ? 'Source subtitle only' : secondaryTrack ? 'Select a source subtitle' : 'No subtitles selected';
+    let description = 'No subtitles selected';
+    if (bothTracksSelected) {
+      description = state.settings.secondaryBelowSource
+        ? 'Source above secondary'
+        : 'Secondary above source';
+    } else if (sourceTrack) {
+      description = 'Source subtitle only';
+    } else if (secondaryTrack) {
+      description = 'Select a source subtitle';
+    }
+    element('subtitleOrder').textContent = description;
+
     const swap = element<HTMLButtonElement>('swapSubtitleOrder');
     swap.hidden = !bothTracksSelected;
     swap.disabled = !state.hasMedia;
+  }
+
+  function renderConversation(state: ViewState): void {
+    // 1. Reset drafts and expanded context only for a new conversation.
     const conversationChanged = renderedConversationId !== state.conversationId;
     if (conversationChanged) {
       renderedConversationId = state.conversationId;
@@ -113,65 +204,137 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       resizeQuestion();
       element<HTMLDetailsElement>('fullCue').open = false;
     }
-    if (element('phrase').textContent !== state.phrase) element('phrase').textContent = state.phrase;
+
+    // 2. Update the selected text, replay action, and answer list.
+    if (element('phrase').textContent !== state.phrase) {
+      element('phrase').textContent = state.phrase;
+    }
     const replay = element<HTMLButtonElement>('replay');
     replay.hidden = !state.replayAvailable;
     replay.textContent = state.replaying ? 'Stop replay' : 'Replay line';
-    if (element('sourceCue').textContent !== state.cue) element('sourceCue').textContent = state.cue;
+    if (element('sourceCue').textContent !== state.cue) {
+      element('sourceCue').textContent = state.cue;
+    }
     element('fullCue').hidden = state.phrase.trim() === state.cue.trim();
+    renderTurns(state, conversationChanged);
+  }
+
+  function createTurnCard(turn: ViewState['turns'][number]): HTMLElement {
+    // 1. Create the turn container and optional user question as plain text.
+    const card = doc.createElement('article');
+    card.className = 'turn';
+    if (turn.question) {
+      const user = doc.createElement('div');
+      user.className = 'user-message';
+      const label = doc.createElement('span');
+      label.className = 'message-label';
+      label.textContent = 'You';
+      const text = doc.createElement('p');
+      text.textContent = turn.question;
+      user.append(label, text);
+      card.append(user);
+    }
+
+    // 2. Add stable answer and status elements for streaming updates.
+    const assistant = doc.createElement('div');
+    assistant.className = 'assistant-message';
+    const answer = doc.createElement('div');
+    answer.className = 'answer';
+    const turnStatus = doc.createElement('small');
+    turnStatus.className = 'turn-status';
+    assistant.append(answer, turnStatus);
+    card.append(assistant);
+
+    return card;
+  }
+
+  function renderTurns(state: ViewState, conversationChanged: boolean): void {
+    // 1. Update answer cards in place so streaming does not disturb reading.
+    const busy = state.turns.at(-1)?.status === 'streaming';
     const turns = element('turns');
-    const newTurn = !conversationChanged && turns.childElementCount > 0 && state.turns.length > turns.childElementCount;
+    const newTurn =
+      !conversationChanged &&
+      turns.childElementCount > 0 &&
+      state.turns.length > turns.childElementCount;
     state.turns.forEach((turn, index) => {
       let card = turns.children[index] as HTMLElement | undefined;
       if (!card) {
-        card = doc.createElement('article'); card.className = 'turn';
-        if (turn.question) {
-          const user = doc.createElement('div'); user.className = 'user-message';
-          const label = doc.createElement('span'); label.className = 'message-label'; label.textContent = 'You';
-          const text = doc.createElement('p'); text.textContent = turn.question;
-          user.append(label, text); card.append(user);
-        }
-        const assistant = doc.createElement('div'); assistant.className = 'assistant-message';
-        const answer = doc.createElement('div'); answer.className = 'answer';
-        const turnStatus = doc.createElement('small'); turnStatus.className = 'turn-status';
-        assistant.append(answer, turnStatus); card.append(assistant); turns.append(card);
+        card = createTurnCard(turn);
+        turns.append(card);
       }
       const answer = card.querySelector<HTMLElement>('.answer')!;
       if (renderedAnswers[index] !== turn.answer) {
-        answer.innerHTML = turn.answer ? markdown.render(turn.answer) : '<p class="placeholder">Waiting for response…</p>';
+        answer.innerHTML = turn.answer
+          ? markdown.render(turn.answer)
+          : '<p class="placeholder">Waiting for response…</p>';
         renderedAnswers[index] = turn.answer;
       }
       const turnStatus = card.querySelector<HTMLElement>('.turn-status')!;
-      turnStatus.textContent = turn.error ? `${turn.status}: ${turn.error}` : turn.status === 'streaming' ? 'Generating…' : turn.status === 'complete' ? '' : turn.status;
+      if (turn.error) {
+        turnStatus.textContent = `${turn.status}: ${turn.error}`;
+      } else if (turn.status === 'streaming') {
+        turnStatus.textContent = 'Generating…';
+      } else if (turn.status === 'complete') {
+        turnStatus.textContent = '';
+      } else {
+        turnStatus.textContent = turn.status;
+      }
       turnStatus.hidden = turn.status === 'complete';
     });
+
+    // 2. Remove obsolete turns and scroll only for a newly submitted question.
     while (turns.children.length > state.turns.length) {
       turns.lastElementChild?.remove();
       renderedAnswers.pop();
     }
-    if (newTurn) turns.scrollTop = turns.scrollHeight;
+    if (newTurn) {
+      turns.scrollTop = turns.scrollHeight;
+    }
+
+    // 3. Expose the controls appropriate to the latest request status.
     element<HTMLButtonElement>('send').disabled = !!busy;
     element('stop').hidden = !busy;
     element('retry').hidden = !['failed', 'incomplete'].includes(state.turns.at(-1)?.status ?? '');
-    if (view === 'chat') return;
+  }
+
+  function renderSettings(state: ViewState): void {
+    // 1. Refresh provider settings without overwriting the focused text input.
     for (const key of ['endpoint', 'model', 'sourceLanguage', 'explanationLanguage'] as const) {
       const input = element<HTMLInputElement>(key);
-      if (doc.activeElement !== input) input.value = state.settings[key];
+      if (doc.activeElement !== input) {
+        input.value = state.settings[key];
+      }
     }
     element<HTMLInputElement>('includeSecondary').checked = state.settings.includeSecondary;
     element<HTMLInputElement>('noKeyRequired').checked = state.settings.noKeyRequired;
+
+    // 2. Retain unsaved appearance drafts and show credential presence only.
     if (!appearanceDraftActive) {
-      for (const key of ['sourceSize', 'sourceColor', 'sourceBottom', 'translationSize', 'translationColor', 'translationGap'] as const) {
+      for (const key of [
+        'sourceSize',
+        'sourceColor',
+        'sourceBottom',
+        'translationSize',
+        'translationColor',
+        'translationGap'
+      ] as const) {
         element<HTMLInputElement>(key).value = String(state.settings.appearance[key]);
       }
     }
-    element('keyStatus').textContent = state.settings.hasSavedKey ? 'A key is saved for this endpoint.' : 'No key is saved for this endpoint.';
-    element('requestUrl').textContent = state.settings.requestUrl ? `Requests go to ${state.settings.requestUrl}` : '';
+    element('keyStatus').textContent = state.settings.hasSavedKey
+      ? 'A key is saved for this endpoint.'
+      : 'No key is saved for this endpoint.';
+    element('requestUrl').textContent = state.settings.requestUrl
+      ? `Requests go to ${state.settings.requestUrl}`
+      : '';
   }
 
   function sendQuestion(): void {
     const value = question.value.trim();
-    if (!value || !state?.open || state.turns.at(-1)?.status === 'streaming') return;
+    if (!value || !state?.open || state.turns.at(-1)?.status === 'streaming') {
+      return;
+    }
+
     bridge.postMessage('followUp', { question: value });
     question.value = '';
     resizeQuestion();
@@ -188,15 +351,27 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     };
   }
 
+  // 2. Connect user actions to the privileged player bridge.
   element('chatTab').addEventListener('click', () => setView('chat'));
   element('subtitlesTab').addEventListener('click', () => setView('subtitles'));
   element('aiTab').addEventListener('click', () => setView('ai'));
-  element('addSubtitleFile').addEventListener('click', () => bridge.postMessage('addSubtitleFile', {}));
-  element('swapSubtitleOrder').addEventListener('click', () => bridge.postMessage('swapSubtitleOrder', {}));
-  for (const [id, role] of [['sourceTrack', 'source'], ['secondaryTrack', 'secondary']] as const) {
-    element<HTMLSelectElement>(id).addEventListener('change', () => bridge.postMessage('selectSubtitleTrack', {
-      role, id: Number(element<HTMLSelectElement>(id).value), epoch: state?.mediaEpoch
-    }));
+  element('addSubtitleFile').addEventListener('click', () =>
+    bridge.postMessage('addSubtitleFile', {})
+  );
+  element('swapSubtitleOrder').addEventListener('click', () =>
+    bridge.postMessage('swapSubtitleOrder', {})
+  );
+  for (const [id, role] of [
+    ['sourceTrack', 'source'],
+    ['secondaryTrack', 'secondary']
+  ] as const) {
+    element<HTMLSelectElement>(id).addEventListener('change', () =>
+      bridge.postMessage('selectSubtitleTrack', {
+        role,
+        id: Number(element<HTMLSelectElement>(id).value),
+        epoch: state?.mediaEpoch
+      })
+    );
   }
   element('send').addEventListener('click', sendQuestion);
   element('stop').addEventListener('click', () => bridge.postMessage('stop', {}));
@@ -207,9 +382,20 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     const enabled = element<HTMLInputElement>('overlayEnabled').checked;
     bridge.postMessage(enabled ? 'enableOverlay' : 'disableOverlay', {});
   });
-  element('saveAppearance').addEventListener('click', () => bridge.postMessage('saveAppearance', readAppearance()));
-  for (const key of ['sourceSize', 'sourceColor', 'sourceBottom', 'translationSize', 'translationColor', 'translationGap']) {
-    element(key).addEventListener('input', () => bridge.postMessage('previewAppearance', readAppearance()));
+  element('saveAppearance').addEventListener('click', () =>
+    bridge.postMessage('saveAppearance', readAppearance())
+  );
+  for (const key of [
+    'sourceSize',
+    'sourceColor',
+    'sourceBottom',
+    'translationSize',
+    'translationColor',
+    'translationGap'
+  ]) {
+    element(key).addEventListener('input', () =>
+      bridge.postMessage('previewAppearance', readAppearance())
+    );
   }
   element('saveSettings').addEventListener('click', () => {
     const keyInput = element<HTMLInputElement>('apiKey');
@@ -225,29 +411,47 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     keyInput.value = '';
     bridge.postMessage('saveSettings', payload);
   });
-  question.addEventListener('keydown', event => {
+  question.addEventListener('keydown', (event) => {
     event.stopPropagation();
-    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); sendQuestion(); }
+    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+      event.preventDefault();
+      sendQuestion();
+    }
   });
-  question.addEventListener('keyup', event => event.stopPropagation());
+  question.addEventListener('keyup', (event) => event.stopPropagation());
   question.addEventListener('input', resizeQuestion);
-  bridge.onMessage('state', encoded => {
+
+  // 3. Receive player state and announce readiness after handlers are registered.
+  bridge.onMessage('state', (encoded) => {
     try {
       const next: unknown = JSON.parse(decodeURIComponent(encoded));
-      if (!next || typeof next !== 'object') return;
+      if (!next || typeof next !== 'object') {
+        return;
+      }
+
       state = next as ViewState;
       render();
-    } catch { /* discard malformed host message */ }
+    } catch {
+      /* discard malformed host message */
+    }
   });
-  bridge.onMessage('showConversation', () => { view = 'chat'; appearanceDraftActive = false; render(); });
+  bridge.onMessage('showConversation', () => {
+    view = 'chat';
+    appearanceDraftActive = false;
+    render();
+  });
   bridge.onMessage('appearancePreviewEnded', () => {
     appearanceDraftActive = false;
     render();
     appearanceDraftActive = view === 'subtitles';
   });
-  doc.addEventListener('visibilitychange', () => bridge.postMessage('visibility', { hidden: doc.hidden }));
+  doc.addEventListener('visibilitychange', () =>
+    bridge.postMessage('visibility', { hidden: doc.hidden })
+  );
   bridge.postMessage('sidebarReady', {});
   bridge.postMessage('visibility', { hidden: doc.hidden });
 }
 
-if (typeof document !== 'undefined' && typeof iina !== 'undefined') mountSidebar(document, iina);
+if (typeof document !== 'undefined' && typeof iina !== 'undefined') {
+  mountSidebar(document, iina);
+}
