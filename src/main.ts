@@ -450,7 +450,7 @@ export class Session {
       if (!this.settings.model) throw new Error('Set an API model in Settings');
       const key = this.settings.noKeyRequired ? null : this.credentials.readForRequest(endpoint.base);
       if (!this.settings.noKeyRequired && !key) throw new Error('Save an API key for this endpoint in Settings');
-      const deepSeekFlash = new URL(endpoint.base).hostname === 'api.deepseek.com' &&
+      const deepSeekFlash = /^https:\/\/api\.deepseek\.com(?:\/|$)/.test(endpoint.base) &&
         this.settings.model === 'deepseek-flash';
       const payload = JSON.stringify({ url: endpoint.requestUrl, key,
         body: { model: this.settings.model, stream: true, messages: request.messages,

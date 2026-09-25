@@ -661,7 +661,13 @@ test('DeepSeek Flash requests disable thinking and use the context prompt', () =
   player.sidebar.get('saveSettings')!({ endpoint: 'https://api.deepseek.com', model: 'deepseek-flash',
     sourceLanguage: 'Turkish', explanationLanguage: 'English', includeSecondary: true,
     noKeyRequired: true, key: '' });
-  select(player);
+  const urlDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'URL');
+  Object.defineProperty(globalThis, 'URL', { value: undefined, configurable: true });
+  try { select(player); }
+  finally {
+    if (urlDescriptor) Object.defineProperty(globalThis, 'URL', urlDescriptor);
+    else Reflect.deleteProperty(globalThis, 'URL');
+  }
   player.frames[0]('READY\n'); player.tick();
   const request = player.writes.find(value => value.includes('/request:'))!;
   const payload = JSON.parse(request.slice(request.indexOf('/request:') + 9));
