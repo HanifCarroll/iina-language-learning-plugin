@@ -209,6 +209,11 @@ test('IINA hit tests clear hover when movement passes through to the player', ()
   expect(bridge._hitTest(1, 1)).toBe(true);
   expect(sourceLine.getAttribute('data-hovered')).toBe('true');
 
+  pointerTarget = sourceLine;
+
+  expect(bridge._hitTest(2, 2)).toBe(false);
+  expect(sourceLine.getAttribute('data-hovered')).toBe('true');
+
   pointerTarget = window.document.body;
 
   expect(bridge._hitTest(2, 2)).toBe(false);
