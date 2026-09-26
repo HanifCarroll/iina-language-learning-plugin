@@ -439,11 +439,14 @@ test('sidebar formats a real explanation, keeps source context available, and do
       )
     );
   state(
-    '**Natural meaning**  \nBy now...\n\n**Breakdown**  \nUntil today...\n\n- **bitirir** = finishes',
+    '### Natural meaning\nBy now...\n\n### Breakdown\n- **bitirir** = finishes\n\n### Grammar\nThe ending marks a habit.',
     'Generating…'
   );
 
-  expect(window.document.querySelectorAll('.answer strong')).toHaveLength(3);
+  expect(
+    [...window.document.querySelectorAll('.answer h3')].map((heading) => heading.textContent)
+  ).toEqual(['Natural meaning', 'Breakdown', 'Grammar']);
+  expect(window.document.querySelectorAll('.answer strong')).toHaveLength(1);
   expect(window.document.querySelector('.assistant-message .message-label')).toBeNull();
   expect(window.document.querySelectorAll('.answer li')).toHaveLength(1);
   expect(window.document.querySelector('#fullCue')?.textContent).toContain('...bugüne kadar');
@@ -454,7 +457,7 @@ test('sidebar formats a real explanation, keeps source context available, and do
   (window.document.querySelector('#question') as unknown as HTMLTextAreaElement).value =
     'A question I am drafting';
   state(
-    '**Natural meaning**  \nBy now...\n\n**Breakdown**  \nUntil today...\n\n- **bitirir** = finishes',
+    '### Natural meaning\nBy now...\n\n### Breakdown\n- **bitirir** = finishes\n\n### Grammar\nThe ending marks a habit.',
     'Complete'
   );
 

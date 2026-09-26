@@ -13,7 +13,7 @@ bun install --frozen-lockfile
 bun run release:check
 ```
 
-In IINA's plugin settings, choose **Install Local Package** and select `dist/io.github.hanifcarroll.iina-language-learning.iinaplugin-0.1.14.iinaplgz`. Restart IINA after an update; hot plugin reload crashed in one test of IINA 1.5.0-beta2. The GitHub repository installation route will be available only after a public release with an archive asset is published.
+In IINA's plugin settings, choose **Install Local Package** and select `dist/io.github.hanifcarroll.iina-language-learning.iinaplugin-0.1.15.iinaplgz`. Restart IINA after an update; hot plugin reload crashed in one test of IINA 1.5.0-beta2. The GitHub repository installation route will be available only after a public release with an archive asset is published.
 
 ## Use it
 

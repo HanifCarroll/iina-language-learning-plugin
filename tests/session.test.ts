@@ -1331,9 +1331,7 @@ test('DeepSeek Flash requests disable thinking and use the context prompt', () =
   const payload = JSON.parse(request.slice(request.indexOf('/request:') + 9));
 
   expect(payload.body.thinking).toEqual({ type: 'disabled' });
-  expect(payload.body.messages[0].content).toContain(
-    'Following cues may qualify the selected line'
-  );
+  expect(payload.body.messages[0].content).toContain('Use its full cue and nearby source cues');
   expect(JSON.parse(payload.body.messages[1].content).task).toBeUndefined();
 
   player.close();

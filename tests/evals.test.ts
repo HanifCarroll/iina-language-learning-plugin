@@ -36,10 +36,11 @@ for (const item of evalCases) {
     expect(source).not.toHaveProperty('task');
     expect(messages[0].role).toBe('system');
     expect(messages[0].content).not.toContain(item.cue);
-    expect(messages[0].content).toContain('do not attribute their words or actions to that line');
-    expect(messages[0].content).toContain('**Natural meaning**');
-    expect(messages[0].content).toContain('**Breakdown**');
-    expect(messages[0].content).toContain('every word in the selected text');
+    expect(messages[0].content).toContain('explain the selected source text');
+    expect(messages[0].content).toContain('selection ends mid-sentence');
+    expect(messages[0].content).toContain('### Natural meaning');
+    expect(messages[0].content).toContain('### Breakdown');
+    expect(messages[0].content).toContain('every selected word exactly once');
 
     if (item.question) {
       expect(messages.map((message) => message.role)).toEqual([

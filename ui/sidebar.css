@@ -89,7 +89,7 @@ nav button[aria-current='page'] {
   background: #232c36;
   border: 1px solid #3b4a59;
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   margin: 8px 0 0;
 }
 .eyebrow {
@@ -108,7 +108,7 @@ nav button[aria-current='page'] {
   overflow-wrap: anywhere;
 }
 #replay {
-  margin-top: 8px;
+  margin-top: 5px;
   min-height: 30px;
   padding: 3px 0;
   font-size: 12px;
@@ -121,7 +121,7 @@ nav button[aria-current='page'] {
   background: transparent;
 }
 details {
-  margin-top: 7px;
+  margin-top: 4px;
   color: #b9c9d8;
 }
 summary {
@@ -235,7 +235,7 @@ details p {
 .answer h4 {
   color: #a8cfee;
   font-size: 13px;
-  margin: 18px 0 6px;
+  margin: 14px 0 5px;
 }
 .placeholder,
 .turn-status {
