@@ -25,10 +25,18 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
 
     // IINA passes movement outside clickable elements to the player, leaving WebView :hover stale.
     bridge._hitTest = (x, y) => {
-      const clickable = nativeHitTest(x, y);
-      sourceLine.dataset.hovered = String(sourceLine.contains(doc.elementFromPoint(x, y)));
+      const buttonBounds = explainLine.getBoundingClientRect();
+      const nearButton =
+        !explainLine.hidden &&
+        x >= buttonBounds.left - 8 &&
+        x <= buttonBounds.right + 8 &&
+        y >= buttonBounds.top - 8 &&
+        y <= buttonBounds.bottom + 8;
+      sourceLine.dataset.hovered = String(
+        sourceLine.contains(doc.elementFromPoint(x, y)) || nearButton
+      );
 
-      return clickable;
+      return nativeHitTest(x, y);
     };
   }
 

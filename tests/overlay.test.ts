@@ -185,6 +185,10 @@ test('IINA hit tests clear hover when movement passes through to the player', ()
   const handlers = new Map<string, (data: string) => void>();
   const sourceLine = window.document.getElementById('source-line')!;
   const cue = window.document.getElementById('cue')!;
+  const button = window.document.getElementById('explain-line')!;
+  Object.defineProperty(button, 'getBoundingClientRect', {
+    value: () => ({ left: 100, right: 200, top: 10, bottom: 30 })
+  });
   let pointerTarget: unknown = cue;
   Object.defineProperty(window.document, 'elementFromPoint', { value: () => pointerTarget });
   const bridge = {
@@ -192,7 +196,12 @@ test('IINA hit tests clear hover when movement passes through to the player', ()
       handlers.set(name, callback);
     },
     postMessage: () => {},
-    _hitTest: (x: number, _y: number) => x === 1
+    _hitTest: (x: number, _y: number) =>
+      x === 1 ||
+      (x >= 100 &&
+        x <= 200 &&
+        !button.hasAttribute('hidden') &&
+        sourceLine.getAttribute('data-hovered') === 'true')
   };
   mountOverlay(window.document as unknown as Document, bridge);
   window.dispatchEvent(new window.Event('load'));
@@ -216,7 +225,16 @@ test('IINA hit tests clear hover when movement passes through to the player', ()
 
   pointerTarget = window.document.body;
 
-  expect(bridge._hitTest(2, 2)).toBe(false);
+  expect(bridge._hitTest(120, 20)).toBe(true);
+  expect(sourceLine.getAttribute('data-hovered')).toBe('true');
+  expect(bridge._hitTest(94, 20)).toBe(false);
+  expect(sourceLine.getAttribute('data-hovered')).toBe('true');
+  expect(bridge._hitTest(90, 20)).toBe(false);
+  expect(sourceLine.getAttribute('data-hovered')).toBe('false');
+
+  handlers.get('cue')!(encodeURIComponent(JSON.stringify(null)));
+
+  expect(bridge._hitTest(120, 20)).toBe(false);
   expect(sourceLine.getAttribute('data-hovered')).toBe('false');
 
   window.happyDOM.abort();

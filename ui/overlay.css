@@ -24,7 +24,7 @@ body {
   position: relative;
   width: max-content;
   max-width: 100%;
-  padding-inline: 36px;
+  padding-inline: 10px;
   box-sizing: border-box;
   margin-inline: auto;
 }
