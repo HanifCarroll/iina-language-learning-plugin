@@ -282,10 +282,16 @@ test('word card uses Microsoft dictionary, falls back on a miss, and resumes on 
     return true;
   };
   player.raw.utils.keychainRead = () => key || false;
-  player.sidebar.get('saveWordSettings')!({
-    provider: 'microsoft',
-    region: 'brazilsouth',
-    key: 'synthetic-key'
+  player.sidebar.get('saveSettings')!({
+    endpoint: '',
+    model: '',
+    sourceLanguage: 'Turkish',
+    explanationLanguage: 'English',
+    includeSecondary: true,
+    noKeyRequired: false,
+    wordProvider: 'microsoft',
+    wordRegion: 'brazilsouth',
+    wordKey: 'synthetic-key'
   });
 
   const cue = { trackId: 1, index: 0, text: 'Ben öyle bir insan mıyım?' };
@@ -333,10 +339,16 @@ test('Google word lookup keeps its key out of view and ignores late results afte
     return true;
   };
   player.raw.utils.keychainRead = () => key || false;
-  player.sidebar.get('saveWordSettings')!({
-    provider: 'google',
-    region: '',
-    key: 'synthetic-google-key'
+  player.sidebar.get('saveSettings')!({
+    endpoint: 'http://127.0.0.1:47891',
+    model: 'synthetic',
+    sourceLanguage: 'Turkish',
+    explanationLanguage: 'English',
+    includeSecondary: true,
+    noKeyRequired: true,
+    wordProvider: 'google',
+    wordRegion: '',
+    wordKey: 'synthetic-google-key'
   });
   player.overlay.get('wordSelected')!({
     cue: { trackId: 1, index: 0, text: 'Ben öyle bir insan mıyım?' },

@@ -70,6 +70,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   let state: ViewState | null = null;
   let view: 'chat' | 'subtitles' | 'ai' = 'chat';
   let appearanceDraftActive = false;
+  let aiDraftActive = false;
   let renderedConversationId: number | null = null;
   let renderedAnswers: string[] = [];
   let renderedTrackOptions = '';
@@ -124,6 +125,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
 
     view = next;
     appearanceDraftActive = false;
+    aiDraftActive = false;
     bridge.postMessage('settingsView', { open: next !== 'chat', view: next });
     render();
     appearanceDraftActive = next === 'subtitles';
@@ -302,31 +304,17 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   }
 
   function renderSettings(state: ViewState): void {
-    // 1. Refresh provider settings without overwriting the focused text input.
-    for (const key of ['endpoint', 'model', 'sourceLanguage', 'explanationLanguage'] as const) {
-      const input = element<HTMLInputElement>(key);
-      if (doc.activeElement !== input) {
-        input.value = state.settings[key];
+    // 1. Refresh saved settings while preserving edits until the user leaves this view.
+    if (!aiDraftActive) {
+      for (const key of ['endpoint', 'model', 'sourceLanguage', 'explanationLanguage'] as const) {
+        element<HTMLInputElement>(key).value = state.settings[key];
       }
+      element<HTMLInputElement>('includeSecondary').checked = state.settings.includeSecondary;
+      element<HTMLInputElement>('noKeyRequired').checked = state.settings.noKeyRequired;
+      element<HTMLSelectElement>('wordProvider').value = state.settings.wordProvider;
+      element<HTMLInputElement>('wordRegion').value = state.settings.wordRegion;
     }
-    element<HTMLInputElement>('includeSecondary').checked = state.settings.includeSecondary;
-    element<HTMLInputElement>('noKeyRequired').checked = state.settings.noKeyRequired;
-    const wordProvider = element<HTMLSelectElement>('wordProvider');
-    if (doc.activeElement !== wordProvider) {
-      wordProvider.value = state.settings.wordProvider;
-    }
-    const wordRegion = element<HTMLInputElement>('wordRegion');
-    if (doc.activeElement !== wordRegion) {
-      wordRegion.value = state.settings.wordRegion;
-    }
-    wordRegion.disabled = state.settings.wordProvider !== 'microsoft';
-    let wordKeyStatus = 'No key is saved for this service.';
-    if (state.settings.wordProvider === 'off') {
-      wordKeyStatus = 'Word lookup is off.';
-    } else if (state.settings.hasWordKey) {
-      wordKeyStatus = 'A key is saved for this service.';
-    }
-    element('wordKeyStatus').textContent = wordKeyStatus;
+    renderWordControls();
 
     // 2. Retain unsaved appearance drafts and show credential presence only.
     if (!appearanceDraftActive) {
@@ -347,6 +335,22 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     element('requestUrl').textContent = state.settings.requestUrl
       ? `Requests go to ${state.settings.requestUrl}`
       : '';
+  }
+
+  function renderWordControls(): void {
+    const provider = element<HTMLSelectElement>('wordProvider').value;
+    element('wordRegionFields').hidden = provider !== 'microsoft';
+    element('wordKeyFields').hidden = provider === 'off';
+    element('wordLookupHint').hidden = provider !== 'microsoft';
+    element('wordKeyLabel').textContent =
+      provider === 'google' ? 'Google Cloud Translation key' : 'Microsoft Translator key';
+    let keyStatus = 'Save settings to use this service.';
+    if (provider === state?.settings.wordProvider) {
+      keyStatus = state.settings.hasWordKey
+        ? 'A key is saved for this service.'
+        : 'No key is saved for this service.';
+    }
+    element('wordKeyStatus').textContent = keyStatus;
   }
 
   function sendQuestion(): void {
@@ -419,6 +423,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   }
   element('saveSettings').addEventListener('click', () => {
     const keyInput = element<HTMLInputElement>('apiKey');
+    const wordKeyInput = element<HTMLInputElement>('wordKey');
     const payload = {
       endpoint: element<HTMLInputElement>('endpoint').value,
       model: element<HTMLInputElement>('model').value,
@@ -426,23 +431,24 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       explanationLanguage: element<HTMLInputElement>('explanationLanguage').value,
       includeSecondary: element<HTMLInputElement>('includeSecondary').checked,
       noKeyRequired: element<HTMLInputElement>('noKeyRequired').checked,
-      key: keyInput.value
+      key: keyInput.value,
+      wordProvider: element<HTMLSelectElement>('wordProvider').value,
+      wordRegion: element<HTMLInputElement>('wordRegion').value,
+      wordKey: wordKeyInput.value
     };
     keyInput.value = '';
+    wordKeyInput.value = '';
     bridge.postMessage('saveSettings', payload);
   });
   element<HTMLSelectElement>('wordProvider').addEventListener('change', () => {
-    element<HTMLInputElement>('wordRegion').disabled =
-      element<HTMLSelectElement>('wordProvider').value !== 'microsoft';
+    element<HTMLInputElement>('wordKey').value = '';
+    renderWordControls();
   });
-  element('saveWordSettings').addEventListener('click', () => {
-    const keyInput = element<HTMLInputElement>('wordKey');
-    bridge.postMessage('saveWordSettings', {
-      provider: element<HTMLSelectElement>('wordProvider').value,
-      region: element<HTMLInputElement>('wordRegion').value,
-      key: keyInput.value
-    });
-    keyInput.value = '';
+  element('aiView').addEventListener('input', () => {
+    aiDraftActive = true;
+  });
+  element('aiView').addEventListener('change', () => {
+    aiDraftActive = true;
   });
   question.addEventListener('keydown', (event) => {
     event.stopPropagation();
@@ -471,6 +477,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   bridge.onMessage('showConversation', () => {
     view = 'chat';
     appearanceDraftActive = false;
+    aiDraftActive = false;
     render();
   });
   bridge.onMessage('appearancePreviewEnded', () => {

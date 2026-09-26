@@ -112,11 +112,16 @@ function validSettings(value: unknown): Settings {
   }
 
   const data = value as Record<string, unknown>;
-  const model = typeof data.model === 'string' ? data.model.trim() : '';
+  if (typeof data.endpoint !== 'string' || typeof data.model !== 'string') {
+    throw new Error('Invalid settings');
+  }
+
+  const endpointText = data.endpoint.trim();
+  const model = data.model.trim();
   const sourceLanguage = typeof data.sourceLanguage === 'string' ? data.sourceLanguage.trim() : '';
   const explanationLanguage =
     typeof data.explanationLanguage === 'string' ? data.explanationLanguage.trim() : '';
-  if (!model || model.length > 120 || !/^[\w./:-]+$/.test(model)) {
+  if ((endpointText || model) && (!model || model.length > 120 || !/^[\w./:-]+$/.test(model))) {
     throw new Error('Enter a valid model name');
   }
 
@@ -134,7 +139,10 @@ function validSettings(value: unknown): Settings {
   }
 
   // 2. Canonicalize the endpoint and retain only supported settings.
-  const endpoint = canonicalEndpoint(String(data.endpoint ?? '')).base;
+  const endpoint = endpointText ? canonicalEndpoint(endpointText).base : '';
+  if (model && !endpoint) {
+    throw new Error('Enter an API base URL');
+  }
 
   return {
     endpoint,
@@ -340,7 +348,6 @@ export class Session {
     sidebar.onMessage('disableOverlay', () => this.disableOverlay());
     sidebar.onMessage('enableOverlay', () => this.enableOverlay());
     sidebar.onMessage('saveSettings', (value) => this.saveSettings(value));
-    sidebar.onMessage('saveWordSettings', (value) => this.saveWordSettings(value));
     sidebar.onMessage('saveAppearance', (value) => this.saveAppearance(value));
     sidebar.onMessage('previewAppearance', (value) => this.previewAppearance(value));
     sidebar.onMessage('addSubtitleFile', () => {
@@ -1341,37 +1348,84 @@ export class Session {
 
   private saveSettings(value: unknown): void {
     try {
-      // 1. Validate settings and save a newly typed key only to Keychain.
-      const next = validSettings({
-        ...(value as object),
-        appearance: this.settings.appearance,
-        secondaryBelowSource: this.settings.secondaryBelowSource,
-        wordProvider: this.settings.wordProvider,
-        wordRegion: this.settings.wordRegion
-      });
-      const key = (value as { key?: unknown }).key;
-      if (key !== '' && key !== undefined) {
-        if (typeof key !== 'string') {
-          throw new Error('Invalid API key');
-        }
-
-        this.credentials.save(next.endpoint, key);
+      // 1. Validate both service choices before storing either key.
+      if (!value || typeof value !== 'object') {
+        throw new Error('Invalid settings');
       }
 
-      // 2. Persist provider settings while keeping appearance separate.
-      const changed =
-        JSON.stringify({ ...next, appearance: undefined }) !==
-          JSON.stringify({ ...this.settings, appearance: undefined }) || !!key;
-      if (changed) {
+      const data = value as Record<string, unknown>;
+      const provider = data.wordProvider ?? this.settings.wordProvider;
+      const region = data.wordRegion ?? this.settings.wordRegion;
+      const wordKey = data.wordKey;
+      if (!['off', 'google', 'microsoft'].includes(String(provider))) {
+        throw new Error('Choose a word lookup provider');
+      }
+      if (
+        typeof region !== 'string' ||
+        (region && !/^[a-z0-9-]{2,64}$/.test(region.trim().toLowerCase()))
+      ) {
+        throw new Error('Enter a valid Microsoft resource region');
+      }
+      if (
+        wordKey !== '' &&
+        wordKey !== undefined &&
+        (provider === 'off' || typeof wordKey !== 'string')
+      ) {
+        throw new Error('Choose a service before saving its key');
+      }
+
+      const next = validSettings({
+        ...data,
+        appearance: this.settings.appearance,
+        secondaryBelowSource: this.settings.secondaryBelowSource,
+        wordProvider: provider,
+        wordRegion: region.trim().toLowerCase()
+      });
+      const key = data.key;
+      if (key !== '' && key !== undefined && typeof key !== 'string') {
+        throw new Error('Invalid API key');
+      }
+      if (key && !next.endpoint) {
+        throw new Error('Enter an API base URL before saving its key');
+      }
+
+      // 2. Save newly typed keys to their respective Keychain entries.
+      if (key !== '' && key !== undefined) {
+        this.credentials.save(next.endpoint, key);
+      }
+      if (wordKey !== '' && wordKey !== undefined && next.wordProvider !== 'off') {
+        this.credentials.save(WORD_ENDPOINTS[next.wordProvider], wordKey as string);
+      }
+
+      // 3. Persist settings and invalidate only work affected by a changed service.
+      const chatChanged =
+        [
+          'endpoint',
+          'model',
+          'sourceLanguage',
+          'explanationLanguage',
+          'includeSecondary',
+          'noKeyRequired'
+        ].some(
+          (field) => next[field as keyof Settings] !== this.settings[field as keyof Settings]
+        ) || !!key;
+      const wordChanged =
+        next.wordProvider !== this.settings.wordProvider ||
+        next.wordRegion !== this.settings.wordRegion ||
+        !!wordKey;
+      if (chatChanged || wordChanged) {
         this.closeWordCard(true);
       }
       this.settings = next;
-      this.hasSavedKey = this.credentials.hasSavedKey(next.endpoint);
+      this.hasSavedKey = next.endpoint ? this.credentials.hasSavedKey(next.endpoint) : false;
+      this.hasWordKey =
+        next.wordProvider !== 'off' &&
+        this.credentials.hasSavedKey(WORD_ENDPOINTS[next.wordProvider]);
       this.host.raw.preferences.set('settings', next);
       this.host.raw.preferences.sync();
 
-      // 3. Close a conversation whose provider settings have changed.
-      if (changed && this.conversation) {
+      // 4. Close a conversation only when its own settings have changed.
+      if (chatChanged && this.conversation) {
         this.closeConversation();
         this.host.showSidebar();
         this.sidebarVisible = true;
@@ -1379,42 +1433,6 @@ export class Session {
       this.status = 'Settings saved. No request was sent.';
     } catch (error) {
       this.status = error instanceof Error ? error.message : 'Could not save settings';
-    }
-    this.render();
-  }
-
-  private saveWordSettings(value: unknown): void {
-    try {
-      // 1. Validate the provider and save a newly entered key only to Keychain.
-      const data = value as { provider?: unknown; region?: unknown; key?: unknown } | null;
-      if (!data || !['off', 'google', 'microsoft'].includes(String(data.provider))) {
-        throw new Error('Choose a word lookup provider');
-      }
-
-      const provider = data.provider as WordProvider;
-      const region = typeof data.region === 'string' ? data.region.trim().toLowerCase() : '';
-      if (region && !/^[a-z0-9-]{2,64}$/.test(region)) {
-        throw new Error('Enter a valid Microsoft resource region');
-      }
-
-      if (data.key !== '' && data.key !== undefined) {
-        if (provider === 'off' || typeof data.key !== 'string') {
-          throw new Error('Choose a provider before saving its key');
-        }
-
-        this.credentials.save(WORD_ENDPOINTS[provider], data.key);
-      }
-
-      // 2. Persist the choice and discard any card using the old provider.
-      this.closeWordCard(true);
-      this.settings = { ...this.settings, wordProvider: provider, wordRegion: region };
-      this.host.raw.preferences.set('settings', this.settings);
-      this.host.raw.preferences.sync();
-      this.hasWordKey =
-        provider !== 'off' && this.credentials.hasSavedKey(WORD_ENDPOINTS[provider]);
-      this.status = 'Word lookup settings saved. No request was sent.';
-    } catch (error) {
-      this.status = error instanceof Error ? error.message : 'Could not save word lookup settings';
     }
     this.render();
   }

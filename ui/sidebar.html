@@ -148,7 +148,6 @@
           <input id="apiKey" type="password" autocomplete="new-password" />
           <p id="keyStatus" class="hint"></p>
         </section>
-        <button id="saveSettings" type="button">Save AI settings</button>
         <section class="settings-group" aria-labelledby="wordLookupHeading">
           <h2 id="wordLookupHeading">Word lookup</h2>
           <p class="notice">Click a subtitle word to pause and see its meaning on the video.</p>
@@ -158,22 +157,26 @@
             <option value="google">Google Cloud Translation</option>
             <option value="microsoft">Microsoft Translator</option>
           </select>
-          <label for="wordRegion">Microsoft resource region</label>
-          <input
-            id="wordRegion"
-            type="text"
-            autocomplete="off"
-            placeholder="For example, brazilsouth"
-          />
-          <label for="wordKey">Save or replace service key</label>
-          <input id="wordKey" type="password" autocomplete="new-password" />
-          <p id="wordKeyStatus" class="hint"></p>
-          <p class="hint">
+          <div id="wordRegionFields" hidden>
+            <label for="wordRegion">Microsoft resource region</label>
+            <input
+              id="wordRegion"
+              type="text"
+              autocomplete="off"
+              placeholder="For example, brazilsouth"
+            />
+          </div>
+          <div id="wordKeyFields" hidden>
+            <label id="wordKeyLabel" for="wordKey">Service key</label>
+            <input id="wordKey" type="password" autocomplete="new-password" />
+            <p id="wordKeyStatus" class="hint"></p>
+          </div>
+          <p id="wordLookupHint" class="hint" hidden>
             Microsoft shows other meanings when its English dictionary finds them. Both services use
             the source and explanation languages above.
           </p>
-          <button id="saveWordSettings" type="button">Save word lookup</button>
         </section>
+        <button id="saveSettings" type="button">Save settings</button>
         <details class="advanced">
           <summary>How requests work</summary>
           <p class="notice">

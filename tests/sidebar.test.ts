@@ -21,76 +21,93 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
   });
 
   // 1. Render untrusted subtitle and model text as content.
-  handlers.get('state')!(
-    encodeURIComponent(
-      JSON.stringify({
-        status: 'Complete',
-        open: true,
-        conversationId: 1,
-        overlayEnabled: true,
-        phrase: '<img src=x>',
-        cue: '<script>bad()</script>',
-        turns: [
-          {
-            question: 'Why?',
-            answer: '<img src="https://evil.example/x">',
-            status: 'complete'
-          }
-        ],
-        settings: {
-          endpoint: 'https://example.com/v1',
-          model: 'test',
-          sourceLanguage: 'Turkish',
-          explanationLanguage: 'English',
-          includeSecondary: true,
-          noKeyRequired: false,
-          hasSavedKey: false,
-          wordProvider: 'off',
-          wordRegion: '',
-          hasSavedWordKey: false,
-          requestUrl: 'https://example.com/v1/chat/completions',
-          appearance: {
-            sourceSize: 28,
-            sourceColor: '#ffffff',
-            sourceBottom: 8,
-            translationSize: 25,
-            translationColor: '#ffffff',
-            translationGap: 12
-          }
-        }
-      })
-    )
-  );
+  const initialState = {
+    status: 'Complete',
+    open: true,
+    conversationId: 1,
+    overlayEnabled: true,
+    phrase: '<img src=x>',
+    cue: '<script>bad()</script>',
+    turns: [
+      {
+        question: 'Why?',
+        answer: '<img src="https://evil.example/x">',
+        status: 'complete'
+      }
+    ],
+    settings: {
+      endpoint: 'https://example.com/v1',
+      model: 'test',
+      sourceLanguage: 'Turkish',
+      explanationLanguage: 'English',
+      includeSecondary: true,
+      noKeyRequired: false,
+      hasSavedKey: false,
+      wordProvider: 'off',
+      wordRegion: '',
+      hasWordKey: false,
+      requestUrl: 'https://example.com/v1/chat/completions',
+      appearance: {
+        sourceSize: 28,
+        sourceColor: '#ffffff',
+        sourceBottom: 8,
+        translationSize: 25,
+        translationColor: '#ffffff',
+        translationGap: 12
+      }
+    }
+  };
+  handlers.get('state')!(encodeURIComponent(JSON.stringify(initialState)));
 
   expect(window.document.querySelectorAll('img,script')).toHaveLength(1); // packaged script element only
   expect(window.document.querySelector('#turns')!.textContent).toContain(
     '<img src="https://evil.example/x">'
   );
 
-  // 2. Save a newly typed key and immediately clear its input.
+  // 2. Show fields for the selected service and save both keys with one action.
   (window.document.querySelector('#aiTab') as unknown as HTMLButtonElement).click();
-  const key = window.document.querySelector('#apiKey') as unknown as HTMLInputElement;
-  key.value = 'new-fixture-value';
-  (window.document.querySelector('#saveSettings') as unknown as HTMLButtonElement).click();
-
-  expect(key.value).toBe('');
-  expect(sent.at(-1)?.name).toBe('saveSettings');
-  expect(sent.at(-1)?.data.key).toBe('new-fixture-value');
-  expect(window.document.body.textContent).not.toContain('new-fixture-value');
+  expect(window.document.querySelector('#wordRegionFields')!.hasAttribute('hidden')).toBe(true);
+  expect(window.document.querySelector('#wordKeyFields')!.hasAttribute('hidden')).toBe(true);
 
   const wordProvider = window.document.querySelector(
     '#wordProvider'
   ) as unknown as HTMLSelectElement;
   const wordKey = window.document.querySelector('#wordKey') as unknown as HTMLInputElement;
   wordProvider.value = 'google';
+  wordProvider.dispatchEvent(new window.Event('change', { bubbles: true }) as unknown as Event);
+  handlers.get('state')!(encodeURIComponent(JSON.stringify(initialState)));
+  expect(wordProvider.value).toBe('google');
+  expect(window.document.querySelector('#wordRegionFields')!.hasAttribute('hidden')).toBe(true);
+  expect(window.document.querySelector('#wordKeyFields')!.hasAttribute('hidden')).toBe(false);
+  expect(window.document.querySelector('#wordKeyLabel')!.textContent).toBe(
+    'Google Cloud Translation key'
+  );
+
+  const key = window.document.querySelector('#apiKey') as unknown as HTMLInputElement;
+  key.value = 'new-fixture-value';
   wordKey.value = 'synthetic-word-key';
-  (window.document.querySelector('#saveWordSettings') as unknown as HTMLButtonElement).click();
-  expect(sent.at(-1)).toEqual({
-    name: 'saveWordSettings',
-    data: { provider: 'google', region: '', key: 'synthetic-word-key' }
-  });
+  (window.document.querySelector('#saveSettings') as unknown as HTMLButtonElement).click();
+
+  expect(key.value).toBe('');
   expect(wordKey.value).toBe('');
+  expect(sent.at(-1)?.name).toBe('saveSettings');
+  expect(sent.at(-1)?.data.key).toBe('new-fixture-value');
+  expect(sent.at(-1)?.data.wordProvider).toBe('google');
+  expect(sent.at(-1)?.data.wordKey).toBe('synthetic-word-key');
+  expect(window.document.body.textContent).not.toContain('new-fixture-value');
   expect(window.document.body.textContent).not.toContain('synthetic-word-key');
+
+  wordProvider.value = 'microsoft';
+  wordProvider.dispatchEvent(new window.Event('change', { bubbles: true }) as unknown as Event);
+  expect(window.document.querySelector('#wordRegionFields')!.hasAttribute('hidden')).toBe(false);
+  expect(window.document.querySelector('#wordKeyLabel')!.textContent).toBe(
+    'Microsoft Translator key'
+  );
+
+  wordProvider.value = 'off';
+  wordProvider.dispatchEvent(new window.Event('change', { bubbles: true }) as unknown as Event);
+  expect(window.document.querySelector('#wordRegionFields')!.hasAttribute('hidden')).toBe(true);
+  expect(window.document.querySelector('#wordKeyFields')!.hasAttribute('hidden')).toBe(true);
 
   // 3. Route the accessible header close action to the host.
   const close = window.document.querySelector('header #close') as unknown as HTMLButtonElement;
