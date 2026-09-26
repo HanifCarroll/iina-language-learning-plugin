@@ -295,6 +295,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     element<HTMLButtonElement>('send').disabled = !!busy;
     element('stop').hidden = !busy;
     element('retry').hidden = !['failed', 'incomplete'].includes(state.turns.at(-1)?.status ?? '');
+    element('composerActions').hidden = element('stop').hidden && element('retry').hidden;
   }
 
   function renderSettings(state: ViewState): void {

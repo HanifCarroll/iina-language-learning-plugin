@@ -37,6 +37,9 @@ for (const item of evalCases) {
     expect(messages[0].role).toBe('system');
     expect(messages[0].content).not.toContain(item.cue);
     expect(messages[0].content).toContain('do not attribute their words or actions to that line');
+    expect(messages[0].content).toContain('**Natural meaning**');
+    expect(messages[0].content).toContain('**Breakdown**');
+    expect(messages[0].content).toContain('every word in the selected text');
 
     if (item.question) {
       expect(messages.map((message) => message.role)).toEqual([
@@ -59,7 +62,7 @@ test('pass/fail grader requires completed text, all case criteria, rubric thresh
   const passing: ReviewItem = {
     status: 'complete',
     answer:
-      '**Natural meaning** Am I that kind of person?\n\n**Literal meaning** Am I such a person?',
+      '**Natural meaning** Am I that kind of person?\n\n**Breakdown** mıyım asks whether I am.',
     scores: [2, 2, 2, 1, 1],
     checks: Object.fromEntries(Object.keys(item.checks).map((key) => [key, true])),
     blockers: [],

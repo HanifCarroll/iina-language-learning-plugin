@@ -53,7 +53,7 @@ export const evalCases: EvalCase[] = [
     cue: 'Gözümden düştün.',
     checks: {
       idiom: 'Explains loss of esteem.',
-      literal: 'Gives the literal image without claiming a physical fall occurred.'
+      image: 'Explains the source words image without claiming a physical fall occurred.'
     }
   },
   {
@@ -139,7 +139,7 @@ export const evalCases: EvalCase[] = [
     cue: 'Ben öyle bir insan mıyım?',
     question: 'Why is bir used here?',
     priorAnswer:
-      '**Natural meaning**\nAm I that kind of person?\n\n**Literal meaning**\nAm I such a person? The phrase bir insan means a person.',
+      '**Natural meaning**\nAm I that kind of person?\n\n**Breakdown**\nÖyle bir insan means that kind of person.',
     checks: {
       direct: 'Answers the bir question directly.',
       original: 'Uses the original phrase and cue, not the current playback cue.',
@@ -148,14 +148,13 @@ export const evalCases: EvalCase[] = [
   },
   {
     id: 'E13',
-    title: 'Elliptical literal gloss',
+    title: 'Elliptical phrase breakdown',
     selected: 'Hesap derken?',
     cue: 'Hesap derken?',
     checks: {
       natural: 'Natural meaning explains the implied question about account.',
-      literal:
-        'Literal meaning gives only a close gloss of hesap and derken, without restating the implied natural question.',
-      breakdown: 'Breakdown explains the omitted meaning separately from the literal gloss.'
+      breakdown: 'Breakdown accounts for hesap and derken and explains how they connect.',
+      ellipsis: 'Explains the implied question separately from the source words.'
     }
   }
 ];

@@ -290,7 +290,24 @@ button:disabled {
 #send {
   background: #37648a;
   border-color: #598fbb;
-  font-weight: 600;
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+}
+#send svg {
+  width: 17px;
+  height: 17px;
+}
+.question-input {
+  position: relative;
+}
+.question-input textarea {
+  padding-right: 44px;
 }
 #close {
   flex: none;
@@ -315,9 +332,6 @@ button:disabled {
   flex-wrap: wrap;
   gap: 7px;
   margin-top: 9px;
-}
-.composer-actions #send {
-  margin-left: auto;
 }
 label {
   display: block;

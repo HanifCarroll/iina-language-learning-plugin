@@ -36,8 +36,8 @@ export function grade(
   if (!item.question && !/\bnatural meaning\b/i.test(answer)) {
     reasons.push('missing Natural meaning');
   }
-  if (!item.question && !/\bliteral meaning\b/i.test(answer)) {
-    reasons.push('missing Literal meaning');
+  if (!item.question && !/\bbreakdown\b/i.test(answer)) {
+    reasons.push('missing Breakdown');
   }
   const dimensions = item.question ? 3 : 5;
   if (

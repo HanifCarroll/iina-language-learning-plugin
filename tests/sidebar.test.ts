@@ -405,7 +405,7 @@ test('sidebar formats a real explanation, keeps source context available, and do
       )
     );
   state(
-    '**Natural meaning**  \nBy now...\n\n**Literal meaning**  \nUntil today...\n\n- **bitirir** = finishes',
+    '**Natural meaning**  \nBy now...\n\n**Breakdown**  \nUntil today...\n\n- **bitirir** = finishes',
     'Generating…'
   );
 
@@ -420,7 +420,7 @@ test('sidebar formats a real explanation, keeps source context available, and do
   (window.document.querySelector('#question') as unknown as HTMLTextAreaElement).value =
     'A question I am drafting';
   state(
-    '**Natural meaning**  \nBy now...\n\n**Literal meaning**  \nUntil today...\n\n- **bitirir** = finishes',
+    '**Natural meaning**  \nBy now...\n\n**Breakdown**  \nUntil today...\n\n- **bitirir** = finishes',
     'Complete'
   );
 
@@ -510,6 +510,11 @@ test('chat composer grows to three lines and streamed answers do not move the me
   });
   const turns = window.document.querySelector('#turns') as unknown as HTMLElement;
   const question = window.document.querySelector('#question') as unknown as HTMLTextAreaElement;
+  const send = window.document.querySelector('#send') as unknown as HTMLButtonElement;
+
+  expect(send.parentElement?.classList.contains('question-input')).toBe(true);
+  expect(send.getAttribute('aria-label')).toBe('Send');
+
   let height = 800;
   Object.defineProperty(turns, 'scrollHeight', { get: () => height });
   Object.defineProperty(turns, 'clientHeight', { get: () => 100 });
@@ -555,6 +560,7 @@ test('chat composer grows to three lines and streamed answers do not move the me
   state([initial]);
 
   expect(turns.scrollTop).toBe(0);
+  expect(window.document.querySelector('#composerActions')?.hasAttribute('hidden')).toBe(true);
   // opening an existing long answer starts at its beginning
   question.value = 'one\ntwo\nthree\nfour';
   question.dispatchEvent(new window.Event('input') as unknown as Event);
@@ -586,7 +592,7 @@ test('chat composer grows to three lines and streamed answers do not move the me
   expect(sent.filter((item) => item.name === 'followUp')).toHaveLength(0);
 
   // 2. Submit one question and bring only that new turn into view.
-  (window.document.querySelector('#send') as unknown as HTMLButtonElement).click();
+  send.click();
 
   expect(sent.at(-1)).toEqual({ name: 'followUp', data: { question: 'one' } });
   expect(question.value).toBe('');
@@ -594,6 +600,7 @@ test('chat composer grows to three lines and streamed answers do not move the me
   state([initial, followUp], 'Generating…');
 
   expect(window.document.querySelectorAll('.assistant-message .message-label')).toHaveLength(0);
+  expect(window.document.querySelector('#composerActions')?.hasAttribute('hidden')).toBe(false);
   expect(turns.scrollTop).toBe(800); // a newly sent question is brought into view
   expect(window.document.querySelector('.user-message')?.textContent).toContain('<img src=x> Why?');
   expect(window.document.querySelector('.user-message img')).toBeNull();

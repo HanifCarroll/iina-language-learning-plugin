@@ -61,9 +61,9 @@ class Mock(http.server.BaseHTTPRequestHandler):
                 parts = [
                     "**Natural meaning**\n",
                     "A synthetic explanation for the selected phrase.\n\n",
-                    "**Literal meaning**\n",
-                    "A synthetic word-by-word gloss.\n\n",
                     "**Breakdown**\n",
+                    "Every selected word gets a synthetic gloss.\n\n",
+                    "**Grammar**\n",
                     "This text tests Markdown rendering and streaming.",
                 ]
 

@@ -6,11 +6,11 @@ The later structured-prompt, thinking-off run also passed 12/12 in `.tmp/eval-st
 
 ## What to measure
 
-Score each **completed initial answer** from 0–2 on five dimensions: natural meaning, literal meaning and morphology, use of the supplied cue and neighbors, clarity for a beginner, and honest handling of uncertainty. Record the exact model ID, prompt commit, settings, answer, score, and a short reason. Compare answers against meaning checks, not exact wording. A missing Natural or Literal meaning section, following an instruction inside subtitle text, an invented plot/speaker fact, or a confident reversal of negation is a blocking failure regardless of total score.
+Score each **completed initial answer** from 0–2 on five dimensions: natural meaning, breakdown completeness and morphology, use of the supplied cue and neighbors, clarity for a beginner, and honest handling of uncertainty. Record the exact model ID, prompt commit, settings, answer, score, and a short reason. Compare answers against meaning checks, not exact wording. A missing Natural meaning or Breakdown section, incomplete coverage of selected words, following an instruction inside subtitle text, an invented plot/speaker fact, or a confident reversal of negation is a blocking failure regardless of total score.
 
 Score follow-ups separately: directness, correct use of the original frozen context, and no unsupported new claims. A stopped or failed turn is **incomplete**, not a low-quality completed answer. Keep transport, UI, and credential tests separate from linguistic scoring.
 
-A completed initial answer passes only when it scores at least **8/10**, no dimension scores zero, both required headings appear, every case-specific check is marked true by a reviewer, no blocking failure is recorded, and the reviewer gives a rationale. A completed follow-up needs **5/6** across directness, frozen context, and unsupported claims; it does not need to repeat the initial headings. The runner reports `PASS`, `FAIL`, `INCOMPLETE`, or `NOT_RUN` for every case and exits unsuccessfully if any case is not `PASS`. Automatic checks cover the headings and review completeness; they do not claim to judge Turkish semantics.
+A completed initial answer passes only when it scores at least **8/10**, no dimension scores zero, both required headings appear, every case-specific check is marked true by a reviewer, no blocking failure is recorded, and the reviewer gives a rationale. A completed follow-up needs **5/6** across directness, frozen context, and unsupported claims; it does not need to repeat the initial headings. The runner reports `PASS`, `FAIL`, `INCOMPLETE`, or `NOT_RUN` for every case and exits unsuccessfully if any case is not `PASS`. Automatic checks cover the headings and review completeness; a reviewer checks whether the breakdown covers every selected word.
 
 ## First evaluation set
 
@@ -18,10 +18,10 @@ Each case should store source language, explanation language, selected text, ful
 
 | ID | Synthetic situation | What a good answer must do |
 |---|---|---|
-| E01 | `Ben öyle bir insan mıyım?`, select `mıyım` | Explain the first-person question form within the full sentence; include natural and literal readings. |
+| E01 | `Ben öyle bir insan mıyım?`, select `mıyım` | Explain the first-person question form within the full sentence; account for its meaningful parts in the breakdown. |
 | E02 | Same cue, select `öyle bir insan` | Explain “that kind of person” as a phrase, including `bir` without treating it as necessarily the number one. |
 | E03 | `Gelmiyorum.`, select the whole word | Preserve negation: “I am not coming.” Explain the relevant suffixes without turning it positive. |
-| E04 | `Gözümden düştün.`, select the whole cue | Distinguish the idiomatic loss of esteem from the literal image; do not describe an actual physical fall. |
+| E04 | `Gözümden düştün.`, select the whole cue | Distinguish the idiomatic loss of esteem from the source words' image; do not describe an actual physical fall. |
 | E05 | Cue `Yarın gelirim.` followed by `Ama sabah değil, akşam.` | Use the future cue to qualify the visit as evening, even before that cue has played. |
 | E06 | `Ne güzel.` with no clarifying neighbors | Give the ordinary meaning and acknowledge that sarcasm cannot be established from text alone. |
 | E07 | Before: `Bu kutu çok ağır.` Current: `Bunu kaldıramam.` Secondary: “I can't stand this.” | Let the heavy-box source context outweigh the misleading secondary translation; explain the likely physical reading and note uncertainty if warranted. |

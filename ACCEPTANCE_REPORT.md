@@ -1,5 +1,11 @@
 # Product acceptance evidence
 
+## Initial explanation and composer update (2026-09-26)
+
+The current prompt asks for **Natural meaning** and a **Breakdown** accounting for every selected word, with **Grammar** when useful. The current evaluation gate checks the first two headings and requires a reviewer to assess breakdown completeness. Earlier live-model verdicts below used the previous prompt and do not establish quality for this revision. The follow-up instruction is unchanged.
+
+The Send control now appears as an icon inside the follow-up input. DOM tests cover its placement, accessible name, and existing send behavior. The updated package builds, but the prompt and composer have not been checked in installed IINA or against a live model.
+
 ## Native playback controls: Top layout workaround (2026-09-24)
 
 Tested on macOS 27.0 / IINA 1.5.0-beta2 with Neden's installed 0.1.12 candidate and the owner's open episode. **PASS, owner-confirmed:** after selecting **Video → Show Video Panel → Layout → Top**, the owner could click the top Play button with Neden active. The accessibility tree showed Neden's overlay and advancing subtitle text. Top remains selected. This is a workaround, not a fix for floating/bottom controls.
