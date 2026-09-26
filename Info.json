@@ -1,8 +1,8 @@
 {
   "name": "Neden",
-  "description": "Select subtitle phrases for contextual AI explanations and follow-up chat.",
+  "description": "Click subtitle words for quick meanings or select phrases for contextual explanations.",
   "identifier": "io.github.hanifcarroll.iina-language-learning",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "ghRepo": "hanifcarroll/iina-language-learning-plugin",
   "ghVersion": 1,
   "author": { "name": "Hanif Carroll" },
@@ -19,6 +19,8 @@
       "includeSecondary": true,
       "noKeyRequired": false,
       "secondaryBelowSource": false,
+      "wordProvider": "off",
+      "wordRegion": "",
       "appearance": {
         "sourceSize": 28,
         "sourceColor": "#ffffff",

@@ -1,6 +1,6 @@
 # Neden
 
-A pre-release IINA plugin that lets you select a subtitle phrase, read an AI explanation in context, and ask follow-up questions without leaving the video.
+A pre-release IINA plugin that lets you click a subtitle word for a quick meaning or select a phrase for an AI explanation and follow-up chat without leaving the video.
 
 Tested on **macOS 27.0** and **IINA 1.5.0-beta2**. The packaged helper was built and tested on Apple silicon. Other combinations have not been tested.
 
@@ -13,20 +13,22 @@ bun install --frozen-lockfile
 bun run release:check
 ```
 
-In IINA's plugin settings, choose **Install Local Package** and select `dist/io.github.hanifcarroll.iina-language-learning.iinaplugin-0.1.12.iinaplgz`. Restart IINA after an update; hot plugin reload crashed in one test of IINA 1.5.0-beta2. The GitHub repository installation route will be available only after a public release with an archive asset is published.
+In IINA's plugin settings, choose **Install Local Package** and select `dist/io.github.hanifcarroll.iina-language-learning.iinaplugin-0.1.13.iinaplgz`. Restart IINA after an update; hot plugin reload crashed in one test of IINA 1.5.0-beta2. The GitHub repository installation route will be available only after a public release with an archive asset is published.
 
 ## Use it
 
 1. Open a video and the Neden sidebar. In **Subtitles**, choose **Add SRT/VTT file…** for a user-supplied UTF-8 source subtitle file, then choose it under **Source subtitle**. Add and choose an optional translation under **Secondary subtitle**. The **Plugin → Neden** menu offers the same track controls. Selectable explanations require an external SRT or VTT source track.
 2. In **AI settings**, enter an OpenAI-compatible HTTPS API base URL and exact model ID. Enter a key if that endpoint requires one. The plugin appends `/chat/completions` to the base URL. Saving settings does not send a request.
-3. Double-click a source word or drag across a phrase. Completing the selection pauses playback and **immediately sends one request**. It may incur a provider charge. A click without selected text does nothing.
-4. Read the streamed explanation and ask follow-ups in the same chat. **Replay line** plays the selected cue once without another AI request, then returns to your previous position and pause state; **Stop replay** returns early. **Stop** marks a partial answer incomplete. The **×** beside Neden hides the sidebar, retains the chat in that player window, and resumes eligible playback. **⌥⌘G** hides or reopens the sidebar. Selecting another phrase replaces the chat.
+3. Optionally choose **Google Cloud Translation** or **Microsoft Translator** under **AI settings → Word lookup**, enter your own service key, and save. Microsoft regional resources also need their resource region. Word lookup uses the source and explanation languages above. Saving does not send a request.
+4. Click a source word to pause the video and open its meaning on the video. Google shows one translation. Microsoft adds alternative meanings when its English dictionary has an entry; otherwise it uses ordinary translation. The card has no part-of-speech label. Close the card to return to the previous pause state. Each lookup can use provider quota.
+5. Double-click a source word or drag across a phrase to open the AI explanation in the sidebar. Completing the selection pauses playback and **immediately sends one request**. It may incur a provider charge.
+6. Read the streamed explanation and ask follow-ups in the same chat. **Replay line** plays the selected cue once without another AI request, then returns to your previous position and pause state; **Stop replay** returns early. **Stop** marks a partial answer incomplete. The **×** beside Neden hides the sidebar, retains the chat in that player window, and resumes eligible playback. **⌥⌘G** hides or reopens the sidebar. Selecting another phrase replaces the chat.
 
 The sidebar separates **Chat**, **Subtitles**, and **AI settings**. When both tracks are selected and the source overlay is usable, Neden stacks the secondary and selectable source lines. **Swap positions** reverses their order and saves that choice. Under **Subtitles → Appearance**, size, color, and vertical spacing can be adjusted separately. Appearance edits preview on the video; **Apply appearance** saves them, while leaving Subtitles restores the saved values. Saving AI settings alone does not save an appearance preview. The **Include secondary subtitle text in AI context** setting controls requests independently of display. To put plugin sidebars on the right in the tested IINA version, use **Video → Show Video Panel → Layout → Sidebar Position → Plugins**; that IINA setting affects all plugin sidebars.
 
 ## Privacy and limits
 
-A request sends the selected phrase, its complete cue, up to three earlier and three later source cues, optional secondary subtitle context, and chat turns directly to the configured endpoint. It does not send the video or complete subtitle file. API keys are stored through IINA's macOS Keychain integration, not in plugin preferences. There is no project-operated server, account, telemetry, or automatic retry. The plugin makes no provider request until a nonempty selection is completed or a follow-up or manual retry is sent.
+An AI explanation request sends the selected phrase, its complete cue, up to three earlier and three later source cues, optional secondary subtitle context, and chat turns directly to the configured endpoint. A word lookup sends only the clicked word to the chosen translation service. Neither sends the video or complete subtitle file. API keys are stored through IINA's macOS Keychain integration, not in plugin preferences. There is no project-operated server, account, telemetry, or automatic retry. The plugin makes no provider request until a word is clicked, a nonempty phrase selection is completed, or a follow-up or manual retry is sent.
 
 The bundled Swift helper performs real incremental HTTPS streaming. It needs IINA's **video-overlay** and **file-system** permissions; the latter permits the helper to make network requests outside IINA's own HTTP domain checks. It accepts HTTP only for explicit loopback test endpoints. System TLS validation and same-origin redirect restrictions apply. The helper has first-byte, idle, and total request timeouts of 20, 30, and 120 seconds. Cancellation invalidates late UI results, but it cannot guarantee that a provider stops work or billing immediately.
 

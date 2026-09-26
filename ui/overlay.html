@@ -14,6 +14,23 @@
         </button>
       </div>
     </div>
+    <section id="word-card" data-clickable="true" aria-label="Word meaning" hidden>
+      <div class="word-card-heading">
+        <strong id="word-card-word"></strong>
+        <button
+          id="word-card-close"
+          data-clickable="true"
+          type="button"
+          aria-label="Close word meaning"
+        >
+          ×
+        </button>
+      </div>
+      <p id="word-card-meaning" role="status"></p>
+      <div id="word-card-alternatives" hidden>
+        <p id="word-card-alternative-list"></p>
+      </div>
+    </section>
     <script src="overlay.js"></script>
   </body>
 </html>

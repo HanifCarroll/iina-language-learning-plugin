@@ -44,10 +44,10 @@ body {
   color: var(--source-color, #fff);
   user-select: text;
   -webkit-user-select: text;
-  cursor: default;
+  cursor: pointer;
 }
 #source-line[data-hovered='true'] #cue {
-  cursor: text;
+  cursor: pointer;
 }
 #explain-line {
   position: absolute;
@@ -103,4 +103,63 @@ body {
 #wrap[data-secondary-below-source='true'] #translation {
   margin-bottom: 0;
   margin-top: var(--translation-gap, 12px);
+}
+#word-card {
+  position: fixed;
+  z-index: 5;
+  width: 260px;
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px solid #52687a;
+  border-radius: 14px;
+  background: #1b2631f5;
+  box-shadow: 0 12px 36px #0009;
+  color: #f7f9fc;
+  text-align: left;
+  text-shadow: none;
+  font:
+    400 15px/1.4 -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+}
+#word-card[hidden],
+#word-card-alternatives[hidden] {
+  display: none;
+}
+.word-card-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+#word-card-word {
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+#word-card-close {
+  border: 0;
+  padding: 0 2px;
+  background: transparent;
+  color: #b7c8d8;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+#word-card-meaning {
+  margin: 9px 0 0;
+  overflow-wrap: anywhere;
+}
+#word-card-alternatives {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #435263;
+  color: #a8bdd0;
+  font-size: 12px;
+}
+#word-card-alternative-list {
+  margin: 4px 0 0;
+  color: #e1e9f1;
+  font-size: 14px;
+  overflow-wrap: anywhere;
 }

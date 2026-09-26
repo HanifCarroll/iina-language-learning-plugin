@@ -14,8 +14,15 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
   const sourceLine = doc.querySelector<HTMLElement>('#source-line')!;
   const translation = doc.querySelector<HTMLElement>('#translation');
   const wrap = doc.querySelector<HTMLElement>('#wrap');
+  const wordCard = doc.querySelector<HTMLElement>('#word-card');
+  const wordCardWord = doc.querySelector<HTMLElement>('#word-card-word');
+  const wordCardMeaning = doc.querySelector<HTMLElement>('#word-card-meaning');
+  const wordCardAlternatives = doc.querySelector<HTMLElement>('#word-card-alternatives');
+  const wordCardAlternativeList = doc.querySelector<HTMLElement>('#word-card-alternative-list');
+  const wordCardClose = doc.querySelector<HTMLButtonElement>('#word-card-close');
   const state = new SelectionState();
   let captureTimer: ReturnType<typeof setTimeout> | null = null;
+  let wordTimer: ReturnType<typeof setTimeout> | null = null;
 
   function installHoverTracking(): void {
     const nativeHitTest = bridge._hitTest;
@@ -58,6 +65,13 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
       clearTimeout(captureTimer);
     }
     captureTimer = null;
+    if (wordTimer) {
+      clearTimeout(wordTimer);
+    }
+    wordTimer = null;
+    if (wordCard) {
+      wordCard.hidden = true;
+    }
     state.dismiss();
     sourceLine.dataset.hovered = 'false';
     doc.getSelection()?.removeAllRanges();
@@ -105,13 +119,54 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
     }, 80);
   }
 
+  function scheduleWord(event: MouseEvent): void {
+    if (wordTimer) {
+      clearTimeout(wordTimer);
+    }
+    const x = event.clientX;
+    const y = event.clientY;
+    const displayed = state.displayed;
+    wordTimer = setTimeout(() => {
+      wordTimer = null;
+      state.dismiss();
+      render();
+      const documentWithCaret = doc as Document & {
+        caretRangeFromPoint?: (x: number, y: number) => Range | null;
+      };
+      const range = documentWithCaret.caretRangeFromPoint?.(x, y);
+      if (!displayed || !range || range.startContainer !== cue.firstChild) {
+        return;
+      }
+
+      bridge.postMessage('wordSelected', {
+        cue: displayed,
+        offset: range.startOffset,
+        x,
+        y
+      });
+    }, 350);
+  }
+
   // 2. Capture phrase selections and the full-line action.
   cue.addEventListener('mousedown', () => {
     state.beginDrag();
     render();
   });
-  cue.addEventListener('mouseup', scheduleCapture);
-  cue.addEventListener('dblclick', scheduleCapture);
+  cue.addEventListener('mouseup', (event) => {
+    const selection = doc.getSelection();
+    if (selection && !selection.isCollapsed) {
+      scheduleCapture();
+    } else {
+      scheduleWord(event);
+    }
+  });
+  cue.addEventListener('dblclick', () => {
+    if (wordTimer) {
+      clearTimeout(wordTimer);
+    }
+    wordTimer = null;
+    scheduleCapture();
+  });
   explainLine.addEventListener('click', () => {
     if (explainLine.hidden || !state.displayed) {
       return;
@@ -127,6 +182,12 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
         start: pending.start,
         end: pending.end
       });
+    }
+  });
+  wordCardClose?.addEventListener('click', () => bridge.postMessage('wordClosed', {}));
+  doc.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && wordCard && !wordCard.hidden) {
+      bridge.postMessage('wordClosed', {});
     }
   });
 
@@ -170,6 +231,76 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
     render();
   });
   bridge.onMessage('clear', dismiss);
+  bridge.onMessage('wordCard', (encoded) => {
+    if (!wordCard || !wordCardWord || !wordCardMeaning || !wordCardAlternatives) {
+      return;
+    }
+    try {
+      const value: unknown = JSON.parse(decodeURIComponent(encoded));
+      if (value === null) {
+        wordCard.hidden = true;
+        return;
+      }
+      if (!value || typeof value !== 'object') {
+        return;
+      }
+
+      const card = value as { word?: unknown; meaning?: unknown; x?: unknown; y?: unknown };
+      if (
+        typeof card.word !== 'string' ||
+        card.word.length > 100 ||
+        typeof card.meaning !== 'string' ||
+        card.meaning.length > 250 ||
+        typeof card.x !== 'number' ||
+        typeof card.y !== 'number'
+      ) {
+        return;
+      }
+
+      wordCardWord.textContent = card.word;
+      wordCardMeaning.textContent = card.meaning;
+      wordCardAlternatives.hidden = true;
+      const width = doc.defaultView?.innerWidth ?? 800;
+      const height = doc.defaultView?.innerHeight ?? 600;
+      wordCard.style.left = `${Math.max(12, Math.min(card.x - 100, width - 296))}px`;
+      wordCard.style.top = `${Math.max(12, Math.min(card.y < 210 ? card.y + 24 : card.y - 176, height - 220))}px`;
+      wordCard.hidden = false;
+    } catch {
+      /* ignore malformed host state */
+    }
+  });
+  bridge.onMessage('wordResult', (encoded) => {
+    if (
+      !wordCard ||
+      wordCard.hidden ||
+      !wordCardMeaning ||
+      !wordCardAlternatives ||
+      !wordCardAlternativeList
+    ) {
+      return;
+    }
+    try {
+      const value = JSON.parse(decodeURIComponent(encoded)) as {
+        meaning?: unknown;
+        alternatives?: unknown;
+      };
+      if (
+        typeof value.meaning !== 'string' ||
+        value.meaning.length > 250 ||
+        !Array.isArray(value.alternatives)
+      ) {
+        return;
+      }
+      const alternatives = value.alternatives
+        .filter((item): item is string => typeof item === 'string' && item.length <= 200)
+        .slice(0, 4);
+      wordCardMeaning.textContent = value.meaning;
+      wordCardAlternativeList.textContent = alternatives.join(' · ');
+      wordCardAlternatives.hidden = alternatives.length === 0;
+    } catch {
+      /* ignore malformed host state */
+    }
+  });
   bridge.onMessage('subtitleOrder', (encoded) => {
     if (!wrap) {
       return;

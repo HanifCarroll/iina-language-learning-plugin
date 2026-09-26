@@ -4,6 +4,7 @@ import { IinaHost, type RawIina } from './iina-host';
 import { NativeStream, type StreamRecord } from './stream';
 import { contextForCue, cueForDisplay, parseSubtitles, type Cue } from './subtitles';
 import type { PendingSelection } from './selection';
+import { languageCode, parseWordResponse, wordAt, type WordProvider } from './word-lookup';
 
 declare const iina: RawIina;
 const PLUGIN_ID = 'io.github.hanifcarroll.iina-language-learning';
@@ -17,6 +18,8 @@ type Settings = {
   noKeyRequired: boolean;
   secondaryBelowSource: boolean;
   appearance: Appearance;
+  wordProvider: WordProvider;
+  wordRegion: string;
 };
 type Appearance = {
   sourceSize: number;
@@ -55,8 +58,15 @@ const DEFAULTS: Settings = {
   includeSecondary: true,
   noKeyRequired: false,
   secondaryBelowSource: false,
-  appearance: DEFAULT_APPEARANCE
+  appearance: DEFAULT_APPEARANCE,
+  wordProvider: 'off',
+  wordRegion: ''
 };
+
+const WORD_ENDPOINTS = {
+  google: 'https://translation.googleapis.com',
+  microsoft: 'https://api.cognitive.microsofttranslator.com'
+} as const;
 
 function validAppearance(value: unknown): Appearance {
   // 1. Validate the incoming appearance object.
@@ -134,7 +144,11 @@ function validSettings(value: unknown): Settings {
     includeSecondary: data.includeSecondary,
     noKeyRequired: data.noKeyRequired,
     secondaryBelowSource: data.secondaryBelowSource === true,
-    appearance: validAppearance(data.appearance)
+    appearance: validAppearance(data.appearance),
+    wordProvider: ['google', 'microsoft'].includes(String(data.wordProvider))
+      ? (data.wordProvider as WordProvider)
+      : 'off',
+    wordRegion: typeof data.wordRegion === 'string' ? data.wordRegion : ''
   };
 }
 
@@ -144,6 +158,18 @@ export class Session {
   private appearancePreview: Appearance | null = null;
   private replay: CueReplay | null = null;
   private hasSavedKey = false;
+  private hasWordKey = false;
+  private wordRequest: {
+    epoch: number;
+    url: string;
+    cueIdentity: string;
+    word: string;
+    sourceCode: string;
+    targetCode: string;
+    originalPaused: boolean;
+    response: string;
+    stream: NativeStream | null;
+  } | null = null;
   private mediaEpoch = 0;
   private mediaUrl = '';
   private ended = false;
@@ -205,10 +231,18 @@ export class Session {
 
     // 2. Normalize legacy appearance settings and check endpoint-bound credentials.
     this.settings.secondaryBelowSource = this.settings.secondaryBelowSource === true;
+    if (!['off', 'google', 'microsoft'].includes(this.settings.wordProvider)) {
+      this.settings.wordProvider = 'off';
+    }
+    this.settings.wordRegion =
+      typeof this.settings.wordRegion === 'string' ? this.settings.wordRegion : '';
     delete (this.settings.appearance as Appearance & { showTranslation?: boolean }).showTranslation;
     try {
       if (this.settings.endpoint) {
         this.hasSavedKey = this.credentials.hasSavedKey(this.settings.endpoint);
+      }
+      if (this.settings.wordProvider !== 'off') {
+        this.hasWordKey = this.credentials.hasSavedKey(WORD_ENDPOINTS[this.settings.wordProvider]);
       }
     } catch {
       /* invalid old configuration remains visibly unusable */
@@ -286,6 +320,8 @@ export class Session {
       this.updateCue(true);
     });
     overlay.onMessage('selected', (value) => this.selectionReceived(value));
+    overlay.onMessage('wordSelected', (value) => this.wordSelected(value));
+    overlay.onMessage('wordClosed', () => this.closeWordCard(true));
     overlay.onMessage('selectionCleared', () => {
       this.pending = null;
     });
@@ -304,6 +340,7 @@ export class Session {
     sidebar.onMessage('disableOverlay', () => this.disableOverlay());
     sidebar.onMessage('enableOverlay', () => this.enableOverlay());
     sidebar.onMessage('saveSettings', (value) => this.saveSettings(value));
+    sidebar.onMessage('saveWordSettings', (value) => this.saveWordSettings(value));
     sidebar.onMessage('saveAppearance', (value) => this.saveAppearance(value));
     sidebar.onMessage('previewAppearance', (value) => this.previewAppearance(value));
     sidebar.onMessage('addSubtitleFile', () => {
@@ -515,6 +552,7 @@ export class Session {
     this.replay = null;
     this.discardAppearancePreview();
     this.cancelRequest();
+    this.closeWordCard(false);
     this.conversation = null;
     this.resume = null;
     this.pending = null;
@@ -580,6 +618,7 @@ export class Session {
       this.host.restorePrimary();
       this.host.restoreSecondary();
       this.pending = null;
+      this.closeWordCard(false);
       if (this.overlayReady) {
         this.host.toOverlay('clear', {});
       }
@@ -663,6 +702,9 @@ export class Session {
     // 3. Publish the source cue only when it changes or a refresh is requested.
     const identity = cue ? `${sourceId}:${cue.index}:${cue.text}` : 'none';
     if (force || identity !== this.cueIdentity) {
+      if (identity !== this.cueIdentity) {
+        this.closeWordCard(false);
+      }
       this.cueIdentity = identity;
       this.host.toOverlay(
         'cue',
@@ -696,6 +738,7 @@ export class Session {
 
     // 2. Clear selection state and refresh the displayed cue.
     this.pending = null;
+    this.closeWordCard(false);
     if (this.overlayReady) {
       this.host.toOverlay('seek', {});
     }
@@ -747,6 +790,7 @@ export class Session {
     }
 
     // 2. Ignore duplicate delivery and freeze the accepted selection.
+    this.closeWordCard(false);
     this.replay = null;
     const key = `${this.mediaEpoch}:${this.sourceId}:${sourceCue.index}:${start}:${end}`;
     if (
@@ -850,6 +894,218 @@ export class Session {
     } catch (error) {
       this.status = error instanceof Error ? error.message : 'Could not explain selection';
       this.render();
+    }
+  }
+
+  private wordSelected(value: unknown): void {
+    // 1. Accept only a word in the source cue currently owned by this window.
+    if (!this.overlayEnabled || !this.source || !value || typeof value !== 'object') {
+      return;
+    }
+
+    const data = value as {
+      cue?: { trackId?: unknown; index?: unknown; text?: unknown };
+      offset?: unknown;
+      x?: unknown;
+      y?: unknown;
+    };
+    const cue = data.cue;
+    if (
+      cue?.trackId !== this.sourceId ||
+      !Number.isInteger(cue.index) ||
+      typeof data.offset !== 'number' ||
+      !Number.isInteger(data.offset) ||
+      typeof data.x !== 'number' ||
+      !Number.isFinite(data.x) ||
+      typeof data.y !== 'number' ||
+      !Number.isFinite(data.y)
+    ) {
+      return;
+    }
+
+    const sourceCue = this.source[cue.index as number];
+    if (
+      !sourceCue ||
+      sourceCue.text !== cue.text ||
+      this.cueIdentity !== `${this.sourceId}:${sourceCue.index}:${sourceCue.text}`
+    ) {
+      return;
+    }
+
+    const selected = wordAt(sourceCue.text, data.offset);
+    if (!selected || selected.word.length > 100) {
+      return;
+    }
+
+    // 2. Pause once, replace any prior card, and keep request ownership local.
+    const originalPaused = this.wordRequest?.originalPaused ?? this.host.paused;
+    this.closeWordCard(false);
+    const request = {
+      epoch: this.mediaEpoch,
+      url: this.mediaUrl,
+      cueIdentity: this.cueIdentity,
+      word: selected.word,
+      sourceCode: '',
+      targetCode: '',
+      originalPaused,
+      response: '',
+      stream: null as NativeStream | null
+    };
+    this.wordRequest = request;
+    this.host.pause();
+    this.host.toOverlay('wordCard', {
+      word: selected.word,
+      meaning: this.settings.wordProvider === 'off' ? 'Choose a service in AI settings.' : '…',
+      alternatives: [],
+      x: data.x,
+      y: data.y
+    });
+
+    // 3. Start only the selected provider, using its saved key in privileged code.
+    try {
+      if (this.settings.wordProvider === 'off') {
+        return;
+      }
+
+      request.sourceCode = languageCode(this.settings.sourceLanguage);
+      request.targetCode = languageCode(this.settings.explanationLanguage);
+      this.startWordRequest(
+        request,
+        this.settings.wordProvider === 'microsoft' && request.targetCode === 'en'
+          ? 'dictionary'
+          : 'translate'
+      );
+    } catch (error) {
+      this.showWordError(request, error instanceof Error ? error.message : 'Word lookup failed');
+    }
+  }
+
+  private startWordRequest(
+    request: NonNullable<Session['wordRequest']>,
+    kind: 'dictionary' | 'translate'
+  ): void {
+    const provider = this.settings.wordProvider;
+    if (provider === 'off') {
+      return;
+    }
+
+    const key = this.credentials.readForRequest(WORD_ENDPOINTS[provider]);
+    if (!key) {
+      throw new Error(
+        `Save a ${provider === 'google' ? 'Google' : 'Microsoft'} word lookup key in AI settings.`
+      );
+    }
+
+    const from = encodeURIComponent(request.sourceCode);
+    const to = encodeURIComponent(request.targetCode);
+    const url =
+      provider === 'google'
+        ? `${WORD_ENDPOINTS.google}/language/translate/v2`
+        : `${WORD_ENDPOINTS.microsoft}/${kind === 'dictionary' ? 'dictionary/lookup' : 'translate'}?api-version=3.0&from=${from}&to=${to}`;
+    const body =
+      provider === 'google'
+        ? {
+            q: request.word,
+            source: request.sourceCode,
+            target: request.targetCode,
+            format: 'text'
+          }
+        : [{ Text: request.word }];
+    const stream = new NativeStream(
+      this.host.raw,
+      this.host.helperPath(),
+      this.host.requestDirectory(++this.nextStreamId),
+      JSON.stringify({
+        mode: 'json',
+        provider,
+        url,
+        body,
+        key,
+        region: this.settings.wordRegion,
+        timeouts: { totalMs: 15_000 }
+      }),
+      (record) => this.wordRecord(request, kind, provider, record)
+    );
+    request.stream = stream;
+    stream.start();
+  }
+
+  private wordRecord(
+    request: NonNullable<Session['wordRequest']>,
+    kind: 'dictionary' | 'translate',
+    provider: Exclude<WordProvider, 'off'>,
+    record: StreamRecord
+  ): void {
+    if (
+      this.wordRequest !== request ||
+      request.epoch !== this.mediaEpoch ||
+      request.url !== this.host.mediaUrl ||
+      request.cueIdentity !== this.cueIdentity
+    ) {
+      return;
+    }
+
+    if (record.kind === 'delta') {
+      request.response += record.value;
+      return;
+    }
+
+    request.stream = null;
+    if (record.kind !== 'done') {
+      this.showWordError(
+        request,
+        record.kind === 'error' && record.value.startsWith('http_')
+          ? 'Word lookup was rejected. Check the provider key and settings.'
+          : 'Word lookup failed.'
+      );
+      return;
+    }
+
+    try {
+      const card = parseWordResponse(provider, kind, request.response, request.word);
+      if (!card && provider === 'microsoft' && kind === 'dictionary') {
+        request.response = '';
+        this.startWordRequest(request, 'translate');
+        return;
+      }
+
+      if (!card) {
+        throw new Error('No translation found for this word.');
+      }
+      this.host.toOverlay('wordResult', card);
+    } catch (error) {
+      this.showWordError(request, error instanceof Error ? error.message : 'Word lookup failed.');
+    }
+  }
+
+  private showWordError(request: NonNullable<Session['wordRequest']>, message: string): void {
+    if (this.wordRequest === request) {
+      this.host.toOverlay('wordResult', { word: request.word, meaning: message, alternatives: [] });
+    }
+  }
+
+  private closeWordCard(resume: boolean): void {
+    const request = this.wordRequest;
+    if (!request) {
+      return;
+    }
+
+    request.stream?.cancel();
+    if (request.stream) {
+      this.retiring.push(request.stream);
+    }
+    this.wordRequest = null;
+    if (this.overlayReady) {
+      this.host.toOverlay('wordCard', null);
+    }
+    if (
+      resume &&
+      !request.originalPaused &&
+      request.epoch === this.mediaEpoch &&
+      request.url === this.host.mediaUrl &&
+      this.host.playable
+    ) {
+      this.host.resume();
     }
   }
 
@@ -1057,6 +1313,7 @@ export class Session {
     this.closeConversation();
     this.cancelRequest();
     this.pending = null;
+    this.closeWordCard(true);
 
     // 2. Release the overlay and restore native subtitles.
     this.overlayEnabled = false;
@@ -1088,7 +1345,9 @@ export class Session {
       const next = validSettings({
         ...(value as object),
         appearance: this.settings.appearance,
-        secondaryBelowSource: this.settings.secondaryBelowSource
+        secondaryBelowSource: this.settings.secondaryBelowSource,
+        wordProvider: this.settings.wordProvider,
+        wordRegion: this.settings.wordRegion
       });
       const key = (value as { key?: unknown }).key;
       if (key !== '' && key !== undefined) {
@@ -1103,6 +1362,9 @@ export class Session {
       const changed =
         JSON.stringify({ ...next, appearance: undefined }) !==
           JSON.stringify({ ...this.settings, appearance: undefined }) || !!key;
+      if (changed) {
+        this.closeWordCard(true);
+      }
       this.settings = next;
       this.hasSavedKey = this.credentials.hasSavedKey(next.endpoint);
       this.host.raw.preferences.set('settings', next);
@@ -1117,6 +1379,42 @@ export class Session {
       this.status = 'Settings saved. No request was sent.';
     } catch (error) {
       this.status = error instanceof Error ? error.message : 'Could not save settings';
+    }
+    this.render();
+  }
+
+  private saveWordSettings(value: unknown): void {
+    try {
+      // 1. Validate the provider and save a newly entered key only to Keychain.
+      const data = value as { provider?: unknown; region?: unknown; key?: unknown } | null;
+      if (!data || !['off', 'google', 'microsoft'].includes(String(data.provider))) {
+        throw new Error('Choose a word lookup provider');
+      }
+
+      const provider = data.provider as WordProvider;
+      const region = typeof data.region === 'string' ? data.region.trim().toLowerCase() : '';
+      if (region && !/^[a-z0-9-]{2,64}$/.test(region)) {
+        throw new Error('Enter a valid Microsoft resource region');
+      }
+
+      if (data.key !== '' && data.key !== undefined) {
+        if (provider === 'off' || typeof data.key !== 'string') {
+          throw new Error('Choose a provider before saving its key');
+        }
+
+        this.credentials.save(WORD_ENDPOINTS[provider], data.key);
+      }
+
+      // 2. Persist the choice and discard any card using the old provider.
+      this.closeWordCard(true);
+      this.settings = { ...this.settings, wordProvider: provider, wordRegion: region };
+      this.host.raw.preferences.set('settings', this.settings);
+      this.host.raw.preferences.sync();
+      this.hasWordKey =
+        provider !== 'off' && this.credentials.hasSavedKey(WORD_ENDPOINTS[provider]);
+      this.status = 'Word lookup settings saved. No request was sent.';
+    } catch (error) {
+      this.status = error instanceof Error ? error.message : 'Could not save word lookup settings';
     }
     this.render();
   }
@@ -1360,6 +1658,7 @@ export class Session {
       settings: {
         ...this.settings,
         hasSavedKey: this.hasSavedKey,
+        hasWordKey: this.hasWordKey,
         requestUrl
       }
     });
@@ -1385,6 +1684,10 @@ export class Session {
       this.active = null;
     }
     this.retiring = this.retiring.filter((stream) => !stream.pump());
+    const wordStream = this.wordRequest?.stream;
+    if (wordStream && wordStream.pump() && this.wordRequest?.stream === wordStream) {
+      this.wordRequest.stream = null;
+    }
   }
 
   private teardown(): void {
@@ -1393,6 +1696,7 @@ export class Session {
     this.replay = null;
     this.conversation?.stop();
     this.cancelRequest();
+    this.closeWordCard(false);
     this.conversation = null;
     this.resume = null;
     this.pending = null;

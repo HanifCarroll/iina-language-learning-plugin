@@ -45,6 +45,9 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
           includeSecondary: true,
           noKeyRequired: false,
           hasSavedKey: false,
+          wordProvider: 'off',
+          wordRegion: '',
+          hasSavedWordKey: false,
           requestUrl: 'https://example.com/v1/chat/completions',
           appearance: {
             sourceSize: 28,
@@ -74,6 +77,20 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
   expect(sent.at(-1)?.name).toBe('saveSettings');
   expect(sent.at(-1)?.data.key).toBe('new-fixture-value');
   expect(window.document.body.textContent).not.toContain('new-fixture-value');
+
+  const wordProvider = window.document.querySelector(
+    '#wordProvider'
+  ) as unknown as HTMLSelectElement;
+  const wordKey = window.document.querySelector('#wordKey') as unknown as HTMLInputElement;
+  wordProvider.value = 'google';
+  wordKey.value = 'synthetic-word-key';
+  (window.document.querySelector('#saveWordSettings') as unknown as HTMLButtonElement).click();
+  expect(sent.at(-1)).toEqual({
+    name: 'saveWordSettings',
+    data: { provider: 'google', region: '', key: 'synthetic-word-key' }
+  });
+  expect(wordKey.value).toBe('');
+  expect(window.document.body.textContent).not.toContain('synthetic-word-key');
 
   // 3. Route the accessible header close action to the host.
   const close = window.document.querySelector('header #close') as unknown as HTMLButtonElement;

@@ -274,6 +274,104 @@ function fakePlayer(alreadyLoaded = false) {
   };
 }
 
+test('word card uses Microsoft dictionary, falls back on a miss, and resumes on close', () => {
+  const player = fakePlayer();
+  let key = '';
+  player.raw.utils.keychainWrite = (_service, _name, value) => {
+    key = value;
+    return true;
+  };
+  player.raw.utils.keychainRead = () => key || false;
+  player.sidebar.get('saveWordSettings')!({
+    provider: 'microsoft',
+    region: 'brazilsouth',
+    key: 'synthetic-key'
+  });
+
+  const cue = { trackId: 1, index: 0, text: 'Ben öyle bir insan mıyım?' };
+  player.overlay.get('wordSelected')!({ cue, offset: 1, x: 400, y: 500 });
+  expect(player.status.paused).toBe(true);
+  expect(player.actions).not.toContain('sidebar show');
+  expect(
+    player.overlayPayloads.filter((item) => item.name === 'wordCard').at(-1)?.value
+  ).toMatchObject({ word: 'Ben', x: 400, y: 500 });
+
+  player.frames[0]('READY\n');
+  player.tick();
+  const first = JSON.parse(
+    player.writes.find((write) => write.includes('/request:'))!.split('/request:')[1]
+  );
+  expect(first.url).toContain('/dictionary/lookup?');
+  expect(first.region).toBe('brazilsouth');
+  expect(first.body).toEqual([{ Text: 'Ben' }]);
+
+  player.frames[0](`DELTA ${btoa(JSON.stringify([{ translations: [] }]))}\nDONE\n`);
+  player.tick();
+  expect(player.frames).toHaveLength(2);
+  player.frames[1]('READY\n');
+  player.tick();
+  const second = JSON.parse(
+    player.writes.filter((write) => write.includes('/request:'))[1].split('/request:')[1]
+  );
+  expect(second.url).toContain('/translate?');
+
+  player.frames[1](`DELTA ${btoa('[{"translations":[{"text":"I"}]}]')}\nDONE\n`);
+  player.tick();
+  expect(player.overlayPayloads.filter((item) => item.name === 'wordResult').at(-1)?.value).toEqual(
+    { word: 'Ben', meaning: 'I', alternatives: [] }
+  );
+  player.overlay.get('wordClosed')!({});
+  expect(player.status.paused).toBe(false);
+  player.close();
+});
+
+test('Google word lookup keeps its key out of view and ignores late results after media changes', () => {
+  const player = fakePlayer();
+  let key = '';
+  player.raw.utils.keychainWrite = (_service, _name, value) => {
+    key = value;
+    return true;
+  };
+  player.raw.utils.keychainRead = () => key || false;
+  player.sidebar.get('saveWordSettings')!({
+    provider: 'google',
+    region: '',
+    key: 'synthetic-google-key'
+  });
+  player.overlay.get('wordSelected')!({
+    cue: { trackId: 1, index: 0, text: 'Ben öyle bir insan mıyım?' },
+    offset: 1,
+    x: 300,
+    y: 400
+  });
+  player.frames[0]('READY\n');
+  player.tick();
+
+  const payload = JSON.parse(
+    player.writes.find((write) => write.includes('/request:'))!.split('/request:')[1]
+  );
+  expect(payload).toMatchObject({
+    mode: 'json',
+    provider: 'google',
+    url: 'https://translation.googleapis.com/language/translate/v2',
+    body: { q: 'Ben', source: 'tr', target: 'en', format: 'text' }
+  });
+  expect(player.states.at(-1).settings).not.toHaveProperty('key');
+  expect(player.overlayPayloads.every((item) => !JSON.stringify(item.value).includes(key))).toBe(
+    true
+  );
+
+  player.status.url = 'file:///replacement.mp4';
+  player.tick();
+  player.frames[0](
+    `DELTA ${btoa(JSON.stringify({ data: { translations: [{ translatedText: 'I' }] } }))}\nDONE\n`
+  );
+  player.tick();
+  expect(player.overlayPayloads.filter((item) => item.name === 'wordResult')).toHaveLength(0);
+  expect(player.actions.at(-1)).not.toBe('resume');
+  player.close();
+});
+
 test('overlay accepts clicks only while a readable source track is active', () => {
   const player = fakePlayer();
 

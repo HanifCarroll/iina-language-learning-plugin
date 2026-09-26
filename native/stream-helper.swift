@@ -80,6 +80,7 @@ private func timeout(_ value: Any?, defaultMs: Int) -> TimeInterval {
 
 private final class Stream: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate {
   let endpoint: URL
+  let jsonMode: Bool
   let firstByteTimeout: TimeInterval
   let idleTimeout: TimeInterval
   let totalTimeout: TimeInterval
@@ -96,8 +97,9 @@ private final class Stream: NSObject, URLSessionDataDelegate, URLSessionTaskDele
   var eventLines: [String] = []
   var answerBytes = 0
 
-  init(endpoint: URL, timeouts: [String: Any]) {
+  init(endpoint: URL, timeouts: [String: Any], jsonMode: Bool = false) {
     self.endpoint = endpoint
+    self.jsonMode = jsonMode
     firstByteTimeout = timeout(timeouts["firstByteMs"], defaultMs: 20_000)
     idleTimeout = timeout(timeouts["idleMs"], defaultMs: 30_000)
     totalTimeout = timeout(timeouts["totalMs"], defaultMs: 120_000)
@@ -144,6 +146,13 @@ private final class Stream: NSObject, URLSessionDataDelegate, URLSessionTaskDele
                   willPerformHTTPRedirection response: HTTPURLResponse,
                   newRequest request: URLRequest,
                   completionHandler: @escaping (URLRequest?) -> Void) {
+    if jsonMode {
+      lock.lock(); reason = "redirect_blocked"; lock.unlock()
+      completionHandler(nil)
+      task.cancel()
+      return
+    }
+
     guard [307, 308].contains(response.statusCode), let next = request.url,
           endpointIsAllowed(next), sameOrigin(endpoint, next) else {
       lock.lock(); reason = "redirect_blocked"; lock.unlock()
@@ -174,6 +183,11 @@ private final class Stream: NSObject, URLSessionDataDelegate, URLSessionTaskDele
   func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
     lock.lock(); lastByte = Date(); lock.unlock()
     pending.append(data)
+    if jsonMode {
+      if pending.count > maxAnswerBytes { cancel("answer_too_large") }
+      return
+    }
+
     while let newline = pending.firstIndex(of: 10) {
       var line = pending.prefix(upTo: newline)
       pending.removeSubrange(...newline)
@@ -227,6 +241,9 @@ private final class Stream: NSObject, URLSessionDataDelegate, URLSessionTaskDele
       } else {
         emit("ERROR \(why)")
       }
+    } else if jsonMode && error == nil && !pending.isEmpty && pending.count <= maxAnswerBytes {
+      emit("DELTA \(pending.base64EncodedString())")
+      emit("DONE")
     } else if sawDone {
       emit("DONE")
     } else if let error {
@@ -299,11 +316,29 @@ private func run() {
   guard let root = (try? JSONSerialization.jsonObject(with: requestData)) as? [String: Any],
         let urlText = root["url"] as? String,
         let url = URL(string: urlText), endpointIsAllowed(url),
-        let body = root["body"] as? [String: Any],
-        JSONSerialization.isValidJSONObject(body),
-        body["stream"] as? Bool == true else { fail("request_invalid") }
+        let body = root["body"],
+        JSONSerialization.isValidJSONObject(body) else { fail("request_invalid") }
+  let mode = root["mode"] as? String ?? "stream"
+  guard mode == "json" || (mode == "stream" && (body as? [String: Any])?["stream"] as? Bool == true) else {
+    fail("request_invalid")
+  }
+  let provider = root["provider"] as? String
+  if mode == "json" {
+    let allowedGoogle = provider == "google" && url.scheme == "https"
+      && url.host == "translation.googleapis.com" && url.path == "/language/translate/v2"
+      && url.query == nil
+    let allowedMicrosoft = provider == "microsoft" && url.scheme == "https"
+      && url.host == "api.cognitive.microsofttranslator.com"
+      && ["/dictionary/lookup", "/translate"].contains(url.path)
+      && url.query?.hasPrefix("api-version=3.0&from=") == true
+    guard allowedGoogle || allowedMicrosoft else { fail("request_invalid") }
+  }
   let key = root["key"] as? String
-  guard key == nil || (!key!.contains("\r") && !key!.contains("\n")) else { fail("key_invalid") }
+  let region = root["region"] as? String ?? ""
+  guard key == nil || (!key!.contains("\r") && !key!.contains("\n")),
+        region.isEmpty || region.range(of: "^[a-z0-9-]{2,64}$", options: .regularExpression) != nil else {
+    fail("key_invalid")
+  }
   guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
         bodyData.count <= maxRequestBytes else { fail("request_invalid") }
 
@@ -311,8 +346,16 @@ private func run() {
   request.httpMethod = "POST"
   request.httpBody = bodyData
   request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-  if let key, !key.isEmpty { request.setValue("Bearer " + key, forHTTPHeaderField: "Authorization") }
-  let active = Stream(endpoint: url, timeouts: root["timeouts"] as? [String: Any] ?? [:])
+  if let key, !key.isEmpty {
+    if provider == "google" { request.setValue(key, forHTTPHeaderField: "x-goog-api-key") }
+    else if provider == "microsoft" { request.setValue(key, forHTTPHeaderField: "Ocp-Apim-Subscription-Key") }
+    else { request.setValue("Bearer " + key, forHTTPHeaderField: "Authorization") }
+  }
+  if provider == "microsoft" && !region.isEmpty {
+    request.setValue(region, forHTTPHeaderField: "Ocp-Apim-Subscription-Region")
+  }
+  let active = Stream(endpoint: url, timeouts: root["timeouts"] as? [String: Any] ?? [:],
+                      jsonMode: mode == "json")
   if let priorStop = control.attach(active) { emit("CANCELLED \(priorStop)"); return }
   active.start(request)
 

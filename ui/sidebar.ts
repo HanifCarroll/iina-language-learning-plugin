@@ -38,6 +38,9 @@ type ViewState = {
     noKeyRequired: boolean;
     secondaryBelowSource: boolean;
     hasSavedKey: boolean;
+    hasWordKey: boolean;
+    wordProvider: 'off' | 'google' | 'microsoft';
+    wordRegion: string;
     requestUrl: string;
     appearance: {
       sourceSize: number;
@@ -308,6 +311,22 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     }
     element<HTMLInputElement>('includeSecondary').checked = state.settings.includeSecondary;
     element<HTMLInputElement>('noKeyRequired').checked = state.settings.noKeyRequired;
+    const wordProvider = element<HTMLSelectElement>('wordProvider');
+    if (doc.activeElement !== wordProvider) {
+      wordProvider.value = state.settings.wordProvider;
+    }
+    const wordRegion = element<HTMLInputElement>('wordRegion');
+    if (doc.activeElement !== wordRegion) {
+      wordRegion.value = state.settings.wordRegion;
+    }
+    wordRegion.disabled = state.settings.wordProvider !== 'microsoft';
+    let wordKeyStatus = 'No key is saved for this service.';
+    if (state.settings.wordProvider === 'off') {
+      wordKeyStatus = 'Word lookup is off.';
+    } else if (state.settings.hasWordKey) {
+      wordKeyStatus = 'A key is saved for this service.';
+    }
+    element('wordKeyStatus').textContent = wordKeyStatus;
 
     // 2. Retain unsaved appearance drafts and show credential presence only.
     if (!appearanceDraftActive) {
@@ -411,6 +430,19 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     };
     keyInput.value = '';
     bridge.postMessage('saveSettings', payload);
+  });
+  element<HTMLSelectElement>('wordProvider').addEventListener('change', () => {
+    element<HTMLInputElement>('wordRegion').disabled =
+      element<HTMLSelectElement>('wordProvider').value !== 'microsoft';
+  });
+  element('saveWordSettings').addEventListener('click', () => {
+    const keyInput = element<HTMLInputElement>('wordKey');
+    bridge.postMessage('saveWordSettings', {
+      provider: element<HTMLSelectElement>('wordProvider').value,
+      region: element<HTMLInputElement>('wordRegion').value,
+      key: keyInput.value
+    });
+    keyInput.value = '';
   });
   question.addEventListener('keydown', (event) => {
     event.stopPropagation();

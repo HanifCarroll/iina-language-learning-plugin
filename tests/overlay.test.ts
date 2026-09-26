@@ -2,6 +2,80 @@ import { test, expect } from 'bun:test';
 import { Window } from 'happy-dom';
 import { mountOverlay } from '../ui/overlay';
 
+test('clicking a word opens a plain-text card while dragging still selects a phrase', async () => {
+  const window = new Window();
+  (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;
+  window.document.body.innerHTML = (await Bun.file('ui/overlay.html').text())
+    .split('<body>')[1]
+    .split('</body>')[0];
+  const style = window.document.createElement('style');
+  style.textContent = await Bun.file('ui/overlay.css').text();
+  window.document.head.append(style);
+  const handlers = new Map<string, (data: string) => void>();
+  const sent: Array<{ name: string; data: unknown }> = [];
+  const cue = window.document.getElementById('cue')!;
+  expect(window.getComputedStyle(cue).cursor).toBe('pointer');
+  Object.defineProperty(window.document, 'caretRangeFromPoint', {
+    value: () => {
+      const range = window.document.createRange();
+      range.setStart(cue.firstChild!, 5);
+      return range;
+    }
+  });
+  mountOverlay(window.document as unknown as Document, {
+    onMessage: (name, callback) => {
+      handlers.set(name, callback);
+    },
+    postMessage: (name, data) => {
+      sent.push({ name, data });
+    }
+  });
+  handlers.get('cue')!(
+    encodeURIComponent(
+      JSON.stringify({
+        trackId: 1,
+        index: 0,
+        text: 'Bu davranışı kaldıramam.'
+      })
+    )
+  );
+
+  cue.dispatchEvent(new window.MouseEvent('mousedown', { clientX: 300, clientY: 500 }));
+  cue.dispatchEvent(new window.MouseEvent('mouseup', { clientX: 300, clientY: 500 }));
+  await Bun.sleep(365);
+  expect(sent.find((item) => item.name === 'wordSelected')?.data).toMatchObject({
+    offset: 5,
+    x: 300,
+    y: 500
+  });
+
+  handlers.get('wordCard')!(
+    encodeURIComponent(
+      JSON.stringify({
+        word: 'davranışı',
+        meaning: '…',
+        x: 300,
+        y: 500
+      })
+    )
+  );
+  handlers.get('wordResult')!(
+    encodeURIComponent(
+      JSON.stringify({
+        word: 'davranışı',
+        meaning: '<img src=x>',
+        alternatives: ['conduct', 'behavior']
+      })
+    )
+  );
+  expect(window.document.getElementById('word-card')!.hasAttribute('hidden')).toBe(false);
+  expect(window.document.getElementById('word-card-meaning')!.textContent).toBe('<img src=x>');
+  expect(window.document.querySelector('#word-card img')).toBeNull();
+  (window.document.getElementById('word-card-close') as unknown as HTMLButtonElement).click();
+  expect(sent.at(-1)?.name).toBe('wordClosed');
+  window.happyDOM.abort();
+});
+
 test('DOM selection survives cue update, while seek clears it', async () => {
   // 1. Mount a synthetic overlay and record host messages.
   const window = new Window();
