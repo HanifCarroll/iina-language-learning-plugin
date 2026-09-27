@@ -150,11 +150,11 @@ function fakePlayer(alreadyLoaded = false) {
       getFlag: (name: string) => props.get(name) ?? false,
       set: (name: string, value: unknown) => {
         props.set(name, value);
-        if (name === 'sid') {
-          raw.core.subtitle.id = value as number;
+        if (name === 'sid' && typeof value === 'string') {
+          raw.core.subtitle.id = value === 'no' ? 0 : Number(value);
         }
-        if (name === 'secondary-sid') {
-          raw.core.subtitle.secondID = value as number;
+        if (name === 'secondary-sid' && typeof value === 'string') {
+          raw.core.subtitle.secondID = value === 'no' ? 0 : Number(value);
         }
       }
     },
@@ -460,12 +460,12 @@ test('Plugin menu loads an SRT and selects source and secondary tracks in this w
   secondaryMenu.items.at(-1)!.action?.();
 
   expect(player.raw.core.subtitle.secondID).toBe(3);
-  expect(player.props.get('secondary-sid')).toBe(3);
+  expect(player.props.get('secondary-sid')).toBe('3');
 
   sourceMenu.items[0].action?.();
 
   expect(player.raw.core.subtitle.id).toBe(0);
-  expect(player.props.get('sid')).toBe(0);
+  expect(player.props.get('sid')).toBe('no');
 
   player.events.get('iina.menu-update')!();
 

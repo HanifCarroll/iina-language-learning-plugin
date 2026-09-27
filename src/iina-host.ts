@@ -184,10 +184,10 @@ export class IinaHost {
     this.raw.core.subtitle.loadTrack(path);
   }
   selectSource(id: number): void {
-    this.raw.mpv.set('sid', id);
+    this.raw.mpv.set('sid', id === 0 ? 'no' : String(id));
   }
   selectSecondary(id: number): void {
-    this.raw.mpv.set('secondary-sid', id);
+    this.raw.mpv.set('secondary-sid', id === 0 ? 'no' : String(id));
   }
 
   ownPrimary(): void {
