@@ -29,6 +29,10 @@ type Appearance = {
   translationColor: string;
   translationGap: number;
 };
+type TrackChoices = {
+  source?: string | null;
+  secondary?: string | null;
+};
 type CueReplay = {
   epoch: number;
   url: string;
@@ -183,6 +187,7 @@ export class Session {
   private ended = false;
   private sourceId: number | null = null;
   private secondaryId: number | null = null;
+  private pendingTrackChoices: TrackChoices | null = null;
   private source: Cue[] | null = null;
   private secondary: Cue[] = [];
   private pending: PendingSelection | null = null;
@@ -220,6 +225,7 @@ export class Session {
     id: string;
   }> = [];
   private closed = false;
+  private reopenListener: string | null = null;
 
   constructor(readonly host: IinaHost) {
     // 1. Load saved settings over the current defaults.
@@ -505,9 +511,88 @@ export class Session {
     } else {
       this.host.selectSecondary(id as number);
     }
+    try {
+      this.rememberTrackChoice(role, id as number);
+    } catch {
+      this.status = 'Track selected, but its choice could not be saved.';
+    }
     this.syncTracks();
     this.updateCue(true);
     this.render();
+  }
+
+  private rememberTrackChoice(role: 'source' | 'secondary', id: number): void {
+    // 1. Keep choices for other movies and the other subtitle role.
+    const stored = this.host.raw.preferences.get('subtitleTrackChoices');
+    const choices = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+    const current = (choices as Record<string, TrackChoices>)[this.mediaUrl];
+    const next = current && typeof current === 'object' ? { ...current } : {};
+    const track = this.host.subtitleTracks.find((item) => item.id === id);
+
+    // 2. Use the external file title because IINA can assign a different ID on reopen.
+    if (id === 0) {
+      next[role] = null;
+    } else if (track?.isExternal && track.title) {
+      next[role] = track.title;
+    } else {
+      delete next[role];
+    }
+
+    // 3. Save only after the current movie's track change succeeds.
+    this.host.raw.preferences.set('subtitleTrackChoices', {
+      ...choices,
+      [this.mediaUrl]: next
+    });
+    this.host.raw.preferences.sync();
+    if (this.pendingTrackChoices) {
+      delete this.pendingTrackChoices[role];
+    }
+  }
+
+  private restoreTrackChoices(): void {
+    // 1. Wait for matching external tracks to appear after IINA opens the movie.
+    const pending = this.pendingTrackChoices;
+    if (!pending) {
+      return;
+    }
+
+    for (const role of ['source', 'secondary'] as const) {
+      const title = pending[role];
+      if (title === undefined) {
+        continue;
+      }
+
+      const matches = this.host.subtitleTracks.filter(
+        (track) => track.isExternal && track.title === title
+      );
+      let id: number | null = null;
+      if (title === null) {
+        id = 0;
+      } else if (matches.length === 1) {
+        id = matches[0].id;
+      }
+      if (id === null) {
+        continue;
+      }
+
+      // 2. Wait for IINA to confirm each choice; it rejects a secondary track
+      // while that same track is still selected as the source.
+      if (role === 'source') {
+        if (this.host.sourceId !== id) {
+          this.host.selectSource(id);
+          continue;
+        }
+      } else {
+        if (id !== 0 && this.host.sourceId === id) {
+          continue;
+        }
+        if (this.host.secondaryId !== id) {
+          this.host.selectSecondary(id);
+          continue;
+        }
+      }
+      delete pending[role];
+    }
   }
 
   private async addSubtitleFile(): Promise<void> {
@@ -568,6 +653,13 @@ export class Session {
     // 2. Reset track ownership and restore native subtitle visibility.
     this.mediaEpoch++;
     this.mediaUrl = this.host.mediaUrl;
+    const saved = this.host.raw.preferences.get('subtitleTrackChoices');
+    const choices =
+      saved && typeof saved === 'object' && !Array.isArray(saved)
+        ? (saved as Record<string, TrackChoices>)[this.mediaUrl]
+        : null;
+    this.pendingTrackChoices =
+      !this.ended && choices && typeof choices === 'object' ? { ...choices } : null;
     this.host.restorePrimary();
     this.host.restoreSecondary();
     this.sourceId = null;
@@ -593,7 +685,8 @@ export class Session {
   }
 
   private syncTracks(): void {
-    // 1. Detect track changes, including titles and external-file availability.
+    // 1. Restore saved choices, then detect track and file availability changes.
+    this.restoreTrackChoices();
     const signature = JSON.stringify(
       this.host.subtitleTracks.map((track) => [
         track.id,
@@ -1725,11 +1818,28 @@ export class Session {
     this.host.hideOverlay();
     if (this.timer) {
       clearInterval(this.timer);
+      this.timer = null;
     }
     for (const { name, id } of this.listeners) {
       this.host.raw.event.off(name, id);
     }
     this.listeners = [];
+
+    // 3. IINA may reuse this player when its movie window opens again.
+    const { event } = this.host.raw;
+    this.reopenListener = event.on('mpv.file-loaded', () => {
+      if (this.reopenListener) {
+        event.off('mpv.file-loaded', this.reopenListener);
+        this.reopenListener = null;
+      }
+
+      this.closed = false;
+      this.windowInitialized = false;
+      this.overlayPageRequested = false;
+      this.overlayReady = false;
+      this.sidebarReady = false;
+      this.start();
+    });
   }
 }
 

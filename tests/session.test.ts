@@ -6,7 +6,11 @@ const source =
   '1\n00:00:00,000 --> 00:00:02,000\nBen öyle bir insan mıyım?\n\n2\n00:00:04,000 --> 00:00:06,000\nNext cue';
 const secondary = '1\n00:00:00,000 --> 00:00:03,000\nAm I that kind of person?';
 
-function fakePlayer(alreadyLoaded = false) {
+function fakePlayer(
+  alreadyLoaded = false,
+  preferences = new Map<string, unknown>(),
+  tracksAvailable = true
+) {
   // 1. Create isolated event, message, and request records for this player.
   const events = new Map<string, () => void>();
   const overlay = new Map<string, (value: unknown) => void>();
@@ -85,20 +89,22 @@ function fakePlayer(alreadyLoaded = false) {
       subtitle: {
         id: 1,
         secondID: 2,
-        tracks: [
-          {
-            id: 1,
-            isExternal: true,
-            title: 'source',
-            codec: 'subrip'
-          },
-          {
-            id: 2,
-            isExternal: true,
-            title: 'secondary',
-            codec: 'subrip'
-          }
-        ],
+        tracks: tracksAvailable
+          ? [
+              {
+                id: 1,
+                isExternal: true,
+                title: 'source',
+                codec: 'subrip'
+              },
+              {
+                id: 2,
+                isExternal: true,
+                title: 'secondary',
+                codec: 'subrip'
+              }
+            ]
+          : [],
         loadTrack: (_path: string) => {
           actions.push('load subtitle');
           raw.core.subtitle.tracks.push({
@@ -219,8 +225,8 @@ function fakePlayer(alreadyLoaded = false) {
       }
     },
     preferences: {
-      get: () => settings,
-      set: () => {},
+      get: (name: string) => preferences.get(name) ?? (name === 'settings' ? settings : undefined),
+      set: (name: string, value: unknown) => preferences.set(name, value),
       sync: () => {}
     },
     utils: {
@@ -541,6 +547,62 @@ test('sidebar track controls share IINA state with the menu and reject stale or 
 
   player.close();
   other.close();
+});
+
+test('subtitle choices return after reopening the same movie and delayed track loading', () => {
+  const preferences = new Map<string, unknown>();
+  const first = fakePlayer(false, preferences);
+  const epoch = first.states.at(-1).mediaEpoch;
+
+  first.sidebar.get('selectSubtitleTrack')!({ role: 'source', id: 2, epoch });
+  first.sidebar.get('selectSubtitleTrack')!({ role: 'secondary', id: 1, epoch });
+  expect(first.states.at(-1).sourceId).toBe(2);
+  expect(first.states.at(-1).secondaryId).toBe(1);
+  first.close();
+
+  const reopened = fakePlayer(false, preferences, false);
+  reopened.raw.core.subtitle.secondID = 0;
+  reopened.raw.core.subtitle.tracks.push(first.raw.core.subtitle.tracks[0]);
+  reopened.tick();
+  expect(reopened.raw.core.subtitle.secondID).toBe(0);
+
+  reopened.raw.core.subtitle.tracks.push(first.raw.core.subtitle.tracks[1]);
+  reopened.tick();
+
+  expect(reopened.raw.core.subtitle.id).toBe(2);
+  expect(reopened.raw.core.subtitle.secondID).toBe(1);
+  expect(reopened.states.at(-1).sourceId).toBe(2);
+  expect(reopened.states.at(-1).secondaryId).toBe(1);
+
+  reopened.status.url = 'file:///different.mp4';
+  reopened.raw.core.subtitle.id = 1;
+  reopened.raw.core.subtitle.secondID = 0;
+  reopened.events.get('mpv.file-loaded')!();
+  expect(reopened.states.at(-1).sourceId).toBe(1);
+  expect(reopened.states.at(-1).secondaryId).toBe(0);
+
+  reopened.close();
+});
+
+test('a reused IINA player restores track choices after its window closes', () => {
+  const player = fakePlayer();
+  const epoch = player.states.at(-1).mediaEpoch;
+  player.sidebar.get('selectSubtitleTrack')!({ role: 'source', id: 2, epoch });
+  player.sidebar.get('selectSubtitleTrack')!({ role: 'secondary', id: 1, epoch });
+  player.close();
+
+  player.raw.core.subtitle.id = 1;
+  player.raw.core.subtitle.secondID = 0;
+  player.events.get('mpv.file-loaded')!();
+  player.events.get('iina.plugin-overlay-loaded')!();
+  player.overlay.get('overlayReady')!({});
+  player.sidebar.get('sidebarReady')!({});
+
+  expect(player.raw.core.subtitle.id).toBe(2);
+  expect(player.raw.core.subtitle.secondID).toBe(1);
+  expect(player.states.at(-1).sourceId).toBe(2);
+  expect(player.states.at(-1).secondaryId).toBe(1);
+  player.close();
 });
 
 test('a subtitle file that becomes readable after a media switch is retried', () => {
@@ -1208,7 +1270,7 @@ test('window teardown cancels an active request and restores native primary visi
   expect(player.writes.some((value) => value.endsWith('/control:STOP\n'))).toBe(true);
   expect(player.props.get('sub-visibility')).toBe(true);
   expect(player.actions).not.toContain('resume');
-  expect(player.events.size).toBe(0);
+  expect([...player.events.keys()]).toEqual(['mpv.file-loaded']);
 });
 
 test('late Stop cannot relabel a completed answer', () => {
