@@ -2,6 +2,8 @@
 
 A pre-release IINA plugin that lets you click a subtitle word for a quick meaning or select a phrase for an AI explanation and follow-up chat without leaving the video.
 
+The [subtitle workbench](tools/subtitle-workbench/README.md) prepares and reviews source-language and English subtitle files for watching with the plugin. Its code and process are versioned here; episode media, subtitle tracks, and review evidence stay local.
+
 Tested on **macOS 27.0** and **IINA 1.5.0-beta2**. The packaged helper was built and tested on Apple silicon. Other combinations have not been tested.
 
 ## Install the current local build
