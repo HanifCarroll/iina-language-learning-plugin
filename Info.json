@@ -2,7 +2,7 @@
   "name": "Neden",
   "description": "Click subtitle words for quick meanings or select phrases for contextual explanations.",
   "identifier": "io.github.hanifcarroll.iina-language-learning",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "ghRepo": "hanifcarroll/iina-language-learning-plugin",
   "ghVersion": 1,
   "author": { "name": "Hanif Carroll" },

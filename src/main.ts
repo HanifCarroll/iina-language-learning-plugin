@@ -226,6 +226,7 @@ export class Session {
   }> = [];
   private closed = false;
   private reopenListener: string | null = null;
+  private escapeHandlerRegistered = false;
 
   constructor(readonly host: IinaHost) {
     // 1. Load saved settings over the current defaults.
@@ -265,6 +266,19 @@ export class Session {
 
   start(): void {
     // 1. Register window and playback lifecycle handlers.
+    if (!this.escapeHandlerRegistered) {
+      this.host.onEscape(() => {
+        if (this.closed || !this.sidebarVisible) {
+          return false;
+        }
+
+        this.dismissSidebar();
+
+        return true;
+      });
+      this.escapeHandlerRegistered = true;
+    }
+
     const { event } = this.host.raw;
     this.refreshSubtitleMenu();
     const on = (name: string, callback: () => void) =>

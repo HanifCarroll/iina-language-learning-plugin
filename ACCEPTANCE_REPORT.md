@@ -1,5 +1,11 @@
 # Product acceptance evidence
 
+## Escape sidebar dismissal (version 0.1.18, 2026-10-04)
+
+Escape now uses the same dismissal action as the sidebar's close button. A high-priority IINA input listener consumes Escape while Neden's sidebar is open; when it is hidden or the player session has closed, the listener leaves IINA's normal handling available. A capture-phase sidebar handler also covers focused form fields and the chat composer. Dismissal retains conversation content, cancels active responses, restores an appearance preview, and resumes only playback owned by that conversation.
+
+The new regression tests failed before the fix and passed afterward. `bun run release:check` passed 84 TypeScript/DOM tests with 688 assertions, lint, formatting, typechecking, package integrity, and 10 controlled native streaming-helper tests. The 0.1.18 archive is built. Installation and foreground native Escape verification are pending; background checks reproduced failure to dismiss, but did not reproduce the reported player crash. These automated checks do not establish native behavior.
+
 ## Initial explanation and composer update (2026-09-26)
 
 The current prompt asks for **Natural meaning** and a **Breakdown** accounting for every selected word, with **Grammar** when useful. The current evaluation gate checks the first two headings and requires a reviewer to assess breakdown completeness. Earlier live-model verdicts below used the previous prompt and do not establish quality for this revision. The follow-up instruction is unchanged.

@@ -35,6 +35,10 @@ export type RawIina = {
     on(name: string, callback: () => void): string;
     off(name: string, id: string): void;
   };
+  input: {
+    PRIORITY_HIGH: number;
+    onKeyDown(key: string, callback: () => boolean, priority: number): void;
+  };
   file: {
     read(path: string, options: object): string | undefined;
     exists(path: string): boolean;
@@ -107,6 +111,10 @@ export class IinaHost {
     readonly raw: RawIina,
     private readonly pluginId: string
   ) {}
+
+  onEscape(callback: () => boolean): void {
+    this.raw.input.onKeyDown('ESC', callback, this.raw.input.PRIORITY_HIGH);
+  }
 
   get mediaUrl(): string {
     return this.raw.core.status.url || '';

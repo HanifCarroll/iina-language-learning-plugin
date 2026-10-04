@@ -460,6 +460,33 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   question.addEventListener('keyup', (event) => event.stopPropagation());
   question.addEventListener('input', resizeQuestion);
 
+  // Capture Escape before focused controls or IINA's playback key binding handle it.
+  doc.addEventListener(
+    'keydown',
+    (event) => {
+      if (event.key !== 'Escape' || event.isComposing) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!event.repeat) {
+        bridge.postMessage('close', {});
+      }
+    },
+    true
+  );
+  doc.addEventListener(
+    'keyup',
+    (event) => {
+      if (event.key === 'Escape' && !event.isComposing) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    },
+    true
+  );
+
   // 3. Receive player state and announce readiness after handlers are registered.
   bridge.onMessage('state', (encoded) => {
     try {

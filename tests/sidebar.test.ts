@@ -2,6 +2,35 @@ import { test, expect } from 'bun:test';
 import { Window } from 'happy-dom';
 import { mountSidebar } from '../ui/sidebar';
 
+test('Escape closes the sidebar from fields and the composer without reaching native handling', async () => {
+  const window = new Window();
+  (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;
+  window.document.body.innerHTML = (await Bun.file('ui/sidebar.html').text())
+    .split('<body>')[1]
+    .split('</body>')[0];
+  const messages: string[] = [];
+  mountSidebar(window.document as unknown as Document, {
+    onMessage: () => {},
+    postMessage: (name) => messages.push(name)
+  });
+  let escapedToNative = 0;
+  window.document.addEventListener('keydown', () => escapedToNative++);
+
+  for (const id of ['question', 'endpoint', 'apiKey', 'sourceSize', 'close']) {
+    const escape = new window.KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true
+    });
+    window.document.getElementById(id)!.dispatchEvent(escape);
+    expect(escape.defaultPrevented).toBe(true);
+  }
+
+  expect(messages.filter((name) => name === 'close')).toHaveLength(5);
+  expect(escapedToNative).toBe(0);
+  window.happyDOM.abort();
+});
+
 test('sidebar renders untrusted text safely and clears newly typed key after save', async () => {
   const window = new Window();
   (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;

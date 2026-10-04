@@ -24,6 +24,7 @@ function fakePlayer(
     value: unknown;
   }> = [];
   const actions: string[] = [];
+  const keyHandlers = new Map<string, { callback: () => boolean; priority: number }>();
   let panelShortcut: (() => void) | null = null;
   type FakeMenuItem = {
     title: string;
@@ -126,6 +127,12 @@ function fakePlayer(
       seekTo: (seconds: number) => {
         status.position = seconds;
         actions.push(`seek ${seconds}`);
+      }
+    },
+    input: {
+      PRIORITY_HIGH: 200,
+      onKeyDown: (key: string, callback: () => boolean, priority: number) => {
+        keyHandlers.set(key, { callback, priority });
       }
     },
     event: {
@@ -271,6 +278,7 @@ function fakePlayer(
     overlayMessages,
     overlayPayloads,
     menuItems,
+    keyHandlers,
     setChosenFile: (path: string) => {
       chosenFile = path;
     },
@@ -431,6 +439,42 @@ test('header close hides the sidebar even without a conversation', () => {
   player.sidebar.get('close')!({});
 
   expect(player.actions.at(-1)).toBe('sidebar hide');
+
+  player.close();
+});
+
+test('Escape closes only an open Neden sidebar before IINA handles the key', () => {
+  const player = fakePlayer();
+  const escape = player.keyHandlers.get('ESC');
+
+  expect(escape).toBeDefined();
+  expect(escape?.priority).toBe(200);
+  expect(escape?.callback()).toBe(false);
+
+  player.shortcut();
+  expect(escape?.callback()).toBe(true);
+  expect(player.actions.at(-1)).toBe('sidebar hide');
+  expect(escape?.callback()).toBe(false);
+
+  player.shortcut();
+  player.close();
+  expect(escape?.callback()).toBe(false);
+});
+
+test('Escape preserves incomplete chat, cancels its request, and resumes owned playback', () => {
+  const player = fakePlayer();
+  select(player);
+  const conversationId = player.states.at(-1).conversationId;
+  player.frames[0]('READY\nDELTA UGFydA==\n');
+  player.tick();
+
+  expect(player.keyHandlers.get('ESC')?.callback()).toBe(true);
+  expect(player.states.at(-1).conversationId).toBe(conversationId);
+  expect(player.states.at(-1).turns[0].answer).toBe('Part');
+  expect(player.states.at(-1).turns[0].status).toBe('incomplete');
+  expect(player.actions).toContain('sidebar hide');
+  expect(player.actions).toContain('resume');
+  expect(player.writes.some((value) => value.endsWith('/control:STOP\n'))).toBe(true);
 
   player.close();
 });
