@@ -879,7 +879,7 @@ test('a follow-up after reopening retained chat pauses playback again', () => {
   player.close();
 });
 
-test('selected secondary stays above source through cue gaps and restores native rendering on mismatch or disable', () => {
+test('selected secondary stays in the overlay through cue gaps and mismatches until disabled', () => {
   // 1. Own secondary rendering while the source track is usable.
   const player = fakePlayer();
   player.tick();
@@ -903,7 +903,7 @@ test('selected secondary stays above source through cue gaps and restores native
   expect(player.props.get('secondary-sub-visibility')).toBe(false);
   expect(player.states.at(-1).settings.appearance.sourceSize).toBe(33);
 
-  // 2. Keep ownership through cue gaps and restore it on mismatched source text.
+  // 2. Keep ownership through cue gaps and mismatched source text.
   player.status.position = 3;
   player.props.set('sub-text', '');
   player.tick();
@@ -913,7 +913,7 @@ test('selected secondary stays above source through cue gaps and restores native
   player.props.set('sub-text', 'Unexpected source text');
   player.tick();
 
-  expect(player.props.get('secondary-sub-visibility')).toBe(true);
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
 
   // 3. Reclaim matching subtitles and release tracks that are turned off.
   player.status.position = 1;
@@ -1332,19 +1332,95 @@ test('late Stop cannot relabel a completed answer', () => {
   player.close();
 });
 
-test('subtitle mismatch restores native source and a later match reclaims it', () => {
+test('subtitle mismatch keeps overlay styling, rejects selections, and recovers on a matching cue', () => {
+  // 1. Preserve both overlay lines when the source text cannot be matched.
   const player = fakePlayer();
+  const displayedCue = () =>
+    player.overlayPayloads.filter((item) => item.name === 'cue').at(-1)?.value;
   player.props.set('sub-text', 'Different source');
   player.tick();
 
-  expect(player.props.get('sub-visibility')).toBe(true);
+  expect(player.props.get('sub-visibility')).toBe(false);
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
+  expect(displayedCue()).toBe('Different source');
+  expect(player.actions.at(-1)).toBe('overlay clickable false');
   expect(player.states.at(-1).status).toContain('does not match');
 
+  // 2. Reject delayed or forged selections and refresh later unmatched text.
+  select(player);
+  player.overlay.get('wordSelected')!({
+    cue: { trackId: 1, index: 0, text: 'Ben öyle bir insan mıyım?' },
+    offset: 1,
+    x: 400,
+    y: 500
+  });
+
+  expect(player.actions).not.toContain('pause');
+  expect(player.frames).toHaveLength(0);
+  expect(player.overlayMessages).not.toContain('wordCard');
+
+  player.props.set('sub-text', 'Another unmatched line');
+  player.tick();
+
+  expect(displayedCue()).toBe('Another unmatched line');
+
+  // 3. Keep timestamp-only mismatches unclickable, then recover without switching renderers.
   player.props.set('sub-text', 'Ben öyle bir insan mıyım?');
+  player.props.set('sub-start', 1);
+  player.tick();
+
+  expect(displayedCue()).toBe('Ben öyle bir insan mıyım?');
+  expect(player.actions.at(-1)).toBe('overlay clickable false');
+
+  player.props.set('sub-start', 0);
   player.tick();
 
   expect(player.props.get('sub-visibility')).toBe(false);
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
+  expect(displayedCue()).toEqual({
+    trackId: 1,
+    index: 0,
+    text: 'Ben öyle bir insan mıyım?'
+  });
+  expect(player.actions.at(-1)).toBe('overlay clickable true');
   expect(player.states.at(-1).status).toBe('Select a subtitle phrase to begin.');
+
+  select(player);
+
+  expect(player.actions).toContain('pause');
+  expect(player.frames).toHaveLength(1);
+
+  player.close();
+});
+
+test('unmatched overlay text clears through gaps and restores native visibility on disable', () => {
+  const player = fakePlayer();
+  const displayedCue = () =>
+    player.overlayPayloads.filter((item) => item.name === 'cue').at(-1)?.value;
+  player.props.set('sub-text', 'Unmatched source');
+  player.tick();
+  player.props.set('sub-text', '');
+  player.tick();
+
+  expect(displayedCue()).toBeNull();
+  expect(player.props.get('sub-visibility')).toBe(false);
+  expect(player.props.get('secondary-sub-visibility')).toBe(false);
+
+  // Text beyond the existing overlay limit stays visible through IINA's native renderer.
+  player.props.set('sub-text', 'x'.repeat(4_001));
+  player.tick();
+
+  expect(displayedCue()).toBeNull();
+  expect(player.props.get('sub-visibility')).toBe(true);
+  expect(player.props.get('secondary-sub-visibility')).toBe(true);
+
+  player.props.set('sub-text', 'Unmatched source');
+  player.tick();
+  player.sidebar.get('disableOverlay')!({});
+
+  expect(player.props.get('sub-visibility')).toBe(true);
+  expect(player.props.get('secondary-sub-visibility')).toBe(true);
+  expect(player.actions).toContain('overlay hide');
 
   player.close();
 });

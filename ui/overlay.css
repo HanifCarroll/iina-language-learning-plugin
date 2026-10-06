@@ -46,8 +46,10 @@ body {
   -webkit-user-select: text;
   cursor: pointer;
 }
-#source-line[data-hovered='true'] #cue {
-  cursor: pointer;
+#cue[data-clickable='false'] {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
 }
 #explain-line {
   position: absolute;

@@ -214,6 +214,7 @@ export class Session {
   private sidebarVisible = false;
   private settingsOpen = false;
   private overlayEnabled = true;
+  private sourceSelectable = false;
   private status = 'Select a subtitle phrase to begin.';
   private cueIdentity = '';
   private translationText = '';
@@ -680,6 +681,7 @@ export class Session {
     this.secondaryId = null;
     this.subtitleTrackState = '';
     this.source = null;
+    this.sourceSelectable = false;
     this.secondary = [];
     this.cueIdentity = '';
     this.translationText = '';
@@ -738,6 +740,7 @@ export class Session {
       }
       this.sourceId = sourceId;
       this.source = null;
+      this.sourceSelectable = false;
       if (sourceTrack && sourceId !== null) {
         try {
           this.source = this.readCues(sourceId);
@@ -770,28 +773,31 @@ export class Session {
   }
 
   private updateCue(force = false): void {
-    // 1. Match the displayed native cue before taking over subtitle rendering.
+    // 1. Keep readable source text in the overlay, even when selection cannot be matched.
     if (!this.overlayReady || !this.overlayEnabled) {
       return;
     }
 
     const sourceId = this.sourceId;
+    const displayed = this.host.displayedSource;
     let cue: Cue | null = null;
     let sourceReady = false;
     if (sourceId !== null && this.source) {
-      const displayed = this.host.displayedSource;
       cue = cueForDisplay(this.source, displayed, this.host.displayedStartMs);
+      sourceReady = displayed.length <= 4_000;
+      if (sourceReady) {
+        this.host.ownPrimary();
+      } else {
+        this.host.restorePrimary();
+      }
+
       const mismatch = 'Subtitle timing or text does not match the selected file.';
       if (displayed && !cue) {
-        this.host.restorePrimary();
-        this.host.restoreSecondary();
         if (this.status !== mismatch) {
           this.status = mismatch;
           this.render();
         }
       } else {
-        sourceReady = true;
-        this.host.ownPrimary();
         if (this.status === mismatch) {
           this.status = 'Select a subtitle phrase to begin.';
           this.render();
@@ -806,7 +812,8 @@ export class Session {
     } else {
       this.host.restoreSecondary();
     }
-    this.host.setOverlayClickable(sourceReady);
+    this.sourceSelectable = sourceReady && (!displayed || cue !== null);
+    this.host.setOverlayClickable(this.sourceSelectable);
     const translation = showSecondary ? this.host.secondaryText : '';
     if (force || translation !== this.translationText) {
       this.translationText = translation;
@@ -814,7 +821,14 @@ export class Session {
     }
 
     // 3. Publish the source cue only when it changes or a refresh is requested.
-    const identity = cue ? `${sourceId}:${cue.index}:${cue.text}` : 'none';
+    const unmatchedText = sourceReady && !cue ? displayed : '';
+    let identity = 'none';
+    if (cue) {
+      identity = `${sourceId}:${cue.index}:${cue.text}`;
+    } else if (unmatchedText) {
+      identity = `unmatched:${sourceId}:${unmatchedText}`;
+    }
+
     if (force || identity !== this.cueIdentity) {
       if (identity !== this.cueIdentity) {
         this.closeWordCard(false);
@@ -828,7 +842,7 @@ export class Session {
               index: cue.index,
               text: cue.text
             }
-          : null
+          : unmatchedText || null
       );
     }
   }
@@ -861,7 +875,13 @@ export class Session {
 
   private selectionReceived(value: unknown): void {
     // 1. Validate the selection against the active source track and cue.
-    if (!this.overlayEnabled || !this.source || !value || typeof value !== 'object') {
+    if (
+      !this.overlayEnabled ||
+      !this.sourceSelectable ||
+      !this.source ||
+      !value ||
+      typeof value !== 'object'
+    ) {
       return;
     }
 
@@ -1013,7 +1033,13 @@ export class Session {
 
   private wordSelected(value: unknown): void {
     // 1. Accept only a word in the source cue currently owned by this window.
-    if (!this.overlayEnabled || !this.source || !value || typeof value !== 'object') {
+    if (
+      !this.overlayEnabled ||
+      !this.sourceSelectable ||
+      !this.source ||
+      !value ||
+      typeof value !== 'object'
+    ) {
       return;
     }
 

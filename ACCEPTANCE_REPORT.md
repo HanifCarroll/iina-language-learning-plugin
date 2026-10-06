@@ -1,5 +1,11 @@
 # Product acceptance evidence
 
+## Consistent subtitle appearance on cue mismatch (version 0.1.19, 2026-10-06)
+
+When IINA's current subtitle text or start time does not match a parsed source cue, Neden now renders the current player text with the saved or previewed overlay appearance. Both source and secondary native subtitles stay suppressed; the source becomes display-only until a matching cue returns. Pending selections and timers are cleared, and host-side guards reject word/phrase callbacks during the mismatch. Unsupported sources and text beyond the existing 4,000-character display limit retain native rendering. Overlay disable and teardown still restore owned native visibility.
+
+`bun run release:check` passed 86 TypeScript/DOM tests with 738 assertions, lint, formatting, typechecking, package integrity, and 10 controlled native streaming-helper tests. Regression checks cover unchanged 34 px source / 26 px secondary appearance, inert unmatched text, text and timestamp mismatches, recovery, cue gaps, oversized text, and overlay disable. Version 0.1.19 is packaged locally; it is not installed or verified in native playback. IINA was not started, as requested, and no live provider request was made.
+
 ## Escape sidebar dismissal (version 0.1.18, 2026-10-04)
 
 Escape now uses the same dismissal action as the sidebar's close button. A high-priority IINA input listener consumes Escape while Neden's sidebar is open; when it is hidden or the player session has closed, the listener leaves IINA's normal handling available. A capture-phase sidebar handler also covers focused form fields and the chat composer. Dismissal retains conversation content, cancels active responses, restores an appearance preview, and resumes only playback owned by that conversation.

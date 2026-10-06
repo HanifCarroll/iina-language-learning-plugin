@@ -21,6 +21,7 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
   const wordCardAlternativeList = doc.querySelector<HTMLElement>('#word-card-alternative-list');
   const wordCardClose = doc.querySelector<HTMLButtonElement>('#word-card-close');
   const state = new SelectionState();
+  let unmatchedText = '';
   let captureTimer: ReturnType<typeof setTimeout> | null = null;
   let wordTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -54,9 +55,11 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
   }
 
   function render(): void {
-    if (cue.textContent !== (state.displayed?.text ?? '')) {
-      cue.textContent = state.displayed?.text ?? '';
+    const text = state.displayed?.text ?? unmatchedText;
+    if (cue.textContent !== text) {
+      cue.textContent = text;
     }
+    cue.dataset.clickable = String(state.displayed !== null);
     explainLine.hidden = !state.displayed?.text.trim() || state.dragging || !!state.pending;
   }
 
@@ -195,7 +198,17 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
   bridge.onMessage('cue', (encoded) => {
     try {
       const next: unknown = JSON.parse(decodeURIComponent(encoded));
+      if (typeof next === 'string' && next.length <= 4_000) {
+        // Unmatched player text keeps the same styling but cannot own a selection.
+        unmatchedText = next;
+        state.cueChanged(null);
+        dismiss();
+
+        return;
+      }
+
       if (next === null) {
+        unmatchedText = '';
         state.cueChanged(null);
         sourceLine.dataset.hovered = 'false';
         render();
@@ -217,6 +230,7 @@ export function mountOverlay(doc: Document, bridge: Bridge): SelectionState {
         return;
       }
 
+      unmatchedText = '';
       state.cueChanged(item);
       sourceLine.dataset.hovered = 'false';
       render();

@@ -135,6 +135,87 @@ test('DOM selection survives cue update, while seek clears it', async () => {
   window.happyDOM.abort();
 });
 
+test('unmatched subtitle text keeps appearance and cancels selection until a matched cue returns', async () => {
+  // 1. Mount the real overlay styles and set independent subtitle sizes.
+  const window = new Window();
+  (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;
+  window.document.body.innerHTML = (await Bun.file('ui/overlay.html').text())
+    .split('<body>')[1]
+    .split('</body>')[0];
+  const style = window.document.createElement('style');
+  style.textContent = await Bun.file('ui/overlay.css').text();
+  window.document.head.append(style);
+  const handlers = new Map<string, (data: string) => void>();
+  const sent: string[] = [];
+  const state = mountOverlay(window.document as unknown as Document, {
+    onMessage: (name, callback) => handlers.set(name, callback),
+    postMessage: (name) => sent.push(name)
+  });
+  const publish = (name: string, value: unknown) =>
+    handlers.get(name)!(encodeURIComponent(JSON.stringify(value)));
+  const cue = window.document.getElementById('cue')!;
+  const translation = window.document.getElementById('translation')!;
+  const button = window.document.getElementById('explain-line')!;
+  const matched = { trackId: 1, index: 0, text: 'Matched subtitle' };
+  publish('appearance', { sourceSize: 34, translationSize: 26 });
+  publish('translation', 'Secondary subtitle');
+  publish('cue', matched);
+  const sourceSize = window.getComputedStyle(cue).fontSize;
+  const secondarySize = window.getComputedStyle(translation).fontSize;
+  expect(sourceSize).toBe('34px');
+  expect(secondarySize).toBe('26px');
+
+  // 2. A mismatch cancels a pending drag and shows only inert player text.
+  cue.dispatchEvent(new window.MouseEvent('mousedown'));
+  const range = window.document.createRange();
+  range.setStart(cue.firstChild!, 0);
+  range.setEnd(cue.firstChild!, 7);
+  window.document.getSelection()!.addRange(range);
+  cue.dispatchEvent(new window.MouseEvent('mouseup'));
+  publish('cue', '<img src=x>Unmatched subtitle');
+  await Bun.sleep(95);
+
+  expect(cue.textContent).toBe('<img src=x>Unmatched subtitle');
+  expect(cue.querySelector('img')).toBeNull();
+  expect(state.displayed).toBeNull();
+  expect(state.dragging).toBe(false);
+  expect(state.pending).toBeNull();
+  expect(window.document.getSelection()!.isCollapsed).toBe(true);
+  expect(button.hasAttribute('hidden')).toBe(true);
+  expect(cue.getAttribute('data-clickable')).toBe('false');
+  window.document.getElementById('source-line')!.setAttribute('data-hovered', 'true');
+  expect(window.getComputedStyle(cue).cursor).toBe('default');
+  expect(window.getComputedStyle(cue).userSelect).toBe('none');
+  expect(window.getComputedStyle(cue).fontSize).toBe(sourceSize);
+  expect(window.getComputedStyle(translation).fontSize).toBe(secondarySize);
+  expect(translation.textContent).toBe('Secondary subtitle');
+  expect(sent).not.toContain('selected');
+  expect(sent).not.toContain('wordSelected');
+
+  // 3. Reject oversized text, clear gaps, and resume selection for a matched cue.
+  publish('cue', 'x'.repeat(4_001));
+
+  expect(cue.textContent).toBe('<img src=x>Unmatched subtitle');
+
+  publish('cue', null);
+
+  expect(cue.textContent).toBe('');
+
+  publish('cue', matched);
+
+  expect(cue.textContent).toBe(matched.text);
+  expect(cue.getAttribute('data-clickable')).toBe('true');
+  expect(window.getComputedStyle(cue).cursor).toBe('pointer');
+  expect(window.getComputedStyle(cue).fontSize).toBe(sourceSize);
+  expect(button.hasAttribute('hidden')).toBe(false);
+
+  (button as unknown as HTMLButtonElement).click();
+
+  expect(sent.filter((name) => name === 'selected')).toHaveLength(1);
+
+  window.happyDOM.abort();
+});
+
 test('subtitle order swaps without changing source selection or secondary text', async () => {
   const window = new Window();
   (window as unknown as { SyntaxError: typeof SyntaxError }).SyntaxError = SyntaxError;
