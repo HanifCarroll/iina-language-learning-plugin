@@ -86,6 +86,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
+        if self.path == "/keepalive-only":
+            for _ in range(24):
+                try:
+                    self.wfile.write(b": keepalive\n\n")
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    return
+                time.sleep(0.25)
+            return
+
         if self.path == "/batched-events":
             event = b'data: {"choices":[{"delta":{"content":"x"}}]}\n\n'
             self.wfile.write(event * 2000 + b"data: [DONE]\n\n")
@@ -142,7 +152,7 @@ class HelperTest(unittest.TestCase):
         cls.server.server_close()
         cls.other.server_close()
 
-    def run_helper(self, path, *, timeouts=None, stop_after_delta=False):
+    def run_helper(self, path, *, timeouts=None, stop_after_delta=False, stop_after_seconds=None):
 
         # 1. Start the helper in a private request directory.
         with tempfile.TemporaryDirectory() as parent:
@@ -172,6 +182,10 @@ class HelperTest(unittest.TestCase):
             received = []
             times = []
             started = time.monotonic()
+            cancellation = None
+            if stop_after_seconds is not None:
+                cancellation = threading.Timer(stop_after_seconds, lambda: os.write(control, b"STOP\n"))
+                cancellation.start()
             for line in process.stdout:
                 line = line.strip()
                 received.append(line)
@@ -181,6 +195,9 @@ class HelperTest(unittest.TestCase):
                     stop_after_delta = False
 
             # 4. Verify process cleanup and empty stderr before returning the observations.
+            if cancellation is not None:
+                cancellation.cancel()
+                cancellation.join()
             os.close(control)
             process.wait(timeout=5)
             self.assertFalse(
@@ -200,6 +217,13 @@ class HelperTest(unittest.TestCase):
         self.assertEqual(len([line for line in lines if line.startswith("DELTA ")]), 3)
         self.assertLess(times[0], times[-1] - 0.4)
         self.assertIn((self.server.server_port, "/stream", True, True), Handler.seen)
+
+    def test_five_second_cancel_before_answer_despite_keepalives(self):
+        lines, times = self.run_helper(self.url("/keepalive-only"), stop_after_seconds=5)
+        self.assertFalse(any(line.startswith("DELTA ") for line in lines))
+        self.assertTrue(lines[-1].startswith("CANCELLED "))
+        self.assertGreaterEqual(times[-1], 4.8)
+        self.assertLess(times[-1], 7)
 
     def test_many_small_events_in_one_network_write(self):
         lines, _ = self.run_helper(self.url("/batched-events"))

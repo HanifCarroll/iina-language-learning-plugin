@@ -28,6 +28,7 @@ type ViewState = {
     answer: string;
     status: string;
     error?: string;
+    lunaFallback?: boolean;
   }>;
   settings: {
     endpoint: string;
@@ -36,6 +37,8 @@ type ViewState = {
     explanationLanguage: string;
     includeSecondary: boolean;
     noKeyRequired: boolean;
+    lunaFallback: boolean;
+    hasLunaKey: boolean;
     secondaryBelowSource: boolean;
     hasSavedKey: boolean;
     hasWordKey: boolean;
@@ -284,7 +287,12 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       } else {
         turnStatus.textContent = turn.status;
       }
-      turnStatus.hidden = turn.status === 'complete';
+      if (turn.lunaFallback) {
+        turnStatus.textContent = ['GPT-6 Luna fallback', turnStatus.textContent]
+          .filter(Boolean)
+          .join(' · ');
+      }
+      turnStatus.hidden = turn.status === 'complete' && !turn.lunaFallback;
     });
 
     // 2. Remove obsolete turns and scroll only for a newly submitted question.
@@ -311,6 +319,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       }
       element<HTMLInputElement>('includeSecondary').checked = state.settings.includeSecondary;
       element<HTMLInputElement>('noKeyRequired').checked = state.settings.noKeyRequired;
+      element<HTMLInputElement>('lunaFallback').checked = state.settings.lunaFallback === true;
       element<HTMLSelectElement>('wordProvider').value = state.settings.wordProvider;
       element<HTMLInputElement>('wordRegion').value = state.settings.wordRegion;
     }
@@ -332,6 +341,9 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     element('keyStatus').textContent = state.settings.hasSavedKey
       ? 'A key is saved for this endpoint.'
       : 'No key is saved for this endpoint.';
+    element('lunaKeyStatus').textContent = state.settings.hasLunaKey
+      ? 'An OpenAI key is saved in Keychain.'
+      : 'Save an OpenAI key to enable fallback.';
     element('requestUrl').textContent = state.settings.requestUrl
       ? `Requests go to ${state.settings.requestUrl}`
       : '';
@@ -424,6 +436,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
   element('saveSettings').addEventListener('click', () => {
     const keyInput = element<HTMLInputElement>('apiKey');
     const wordKeyInput = element<HTMLInputElement>('wordKey');
+    const lunaKeyInput = element<HTMLInputElement>('lunaKey');
     const payload = {
       endpoint: element<HTMLInputElement>('endpoint').value,
       model: element<HTMLInputElement>('model').value,
@@ -431,6 +444,8 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       explanationLanguage: element<HTMLInputElement>('explanationLanguage').value,
       includeSecondary: element<HTMLInputElement>('includeSecondary').checked,
       noKeyRequired: element<HTMLInputElement>('noKeyRequired').checked,
+      lunaFallback: element<HTMLInputElement>('lunaFallback').checked,
+      lunaKey: lunaKeyInput.value,
       key: keyInput.value,
       wordProvider: element<HTMLSelectElement>('wordProvider').value,
       wordRegion: element<HTMLInputElement>('wordRegion').value,
@@ -438,6 +453,7 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     };
     keyInput.value = '';
     wordKeyInput.value = '';
+    lunaKeyInput.value = '';
     bridge.postMessage('saveSettings', payload);
   });
   element<HTMLSelectElement>('wordProvider').addEventListener('change', () => {

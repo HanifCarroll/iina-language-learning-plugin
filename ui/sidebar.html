@@ -148,6 +148,21 @@
           <input id="apiKey" type="password" autocomplete="new-password" />
           <p id="keyStatus" class="hint"></p>
         </section>
+        <section class="settings-group" aria-labelledby="fallbackHeading">
+          <h2 id="fallbackHeading">DeepSeek fallback</h2>
+          <label class="checkbox"
+            ><input id="lunaFallback" type="checkbox" />Use GPT-6 Luna if DeepSeek has not started
+            answering after 5 seconds</label
+          >
+          <p class="notice">
+            Sends the same phrase, context, and chat to OpenAI once. The switch is shown in Chat.
+            Both providers may charge, even after cancellation. An answer already in progress stays
+            with DeepSeek.
+          </p>
+          <label for="lunaKey">Save or replace OpenAI API key</label>
+          <input id="lunaKey" type="password" autocomplete="new-password" />
+          <p id="lunaKeyStatus" class="hint"></p>
+        </section>
         <section class="settings-group" aria-labelledby="wordLookupHeading">
           <h2 id="wordLookupHeading">Word lookup</h2>
           <p class="notice">Click a subtitle word to pause and see its meaning on the video.</p>

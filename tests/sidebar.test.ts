@@ -72,6 +72,8 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
       includeSecondary: true,
       noKeyRequired: false,
       hasSavedKey: false,
+      lunaFallback: false,
+      hasLunaKey: false,
       wordProvider: 'off',
       wordRegion: '',
       hasWordKey: false,
@@ -113,18 +115,43 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
   );
 
   const key = window.document.querySelector('#apiKey') as unknown as HTMLInputElement;
+  const lunaKey = window.document.querySelector('#lunaKey') as unknown as HTMLInputElement;
+  const lunaFallback = window.document.querySelector(
+    '#lunaFallback'
+  ) as unknown as HTMLInputElement;
   key.value = 'new-fixture-value';
+  lunaKey.value = 'synthetic-openai-key';
+  lunaFallback.checked = true;
   wordKey.value = 'synthetic-word-key';
   (window.document.querySelector('#saveSettings') as unknown as HTMLButtonElement).click();
 
   expect(key.value).toBe('');
+  expect(lunaKey.value).toBe('');
   expect(wordKey.value).toBe('');
   expect(sent.at(-1)?.name).toBe('saveSettings');
   expect(sent.at(-1)?.data.key).toBe('new-fixture-value');
+  expect(sent.at(-1)?.data.lunaKey).toBe('synthetic-openai-key');
+  expect(sent.at(-1)?.data.lunaFallback).toBe(true);
   expect(sent.at(-1)?.data.wordProvider).toBe('google');
   expect(sent.at(-1)?.data.wordKey).toBe('synthetic-word-key');
   expect(window.document.body.textContent).not.toContain('new-fixture-value');
   expect(window.document.body.textContent).not.toContain('synthetic-word-key');
+  expect(window.document.body.textContent).not.toContain('synthetic-openai-key');
+
+  handlers.get('state')!(
+    encodeURIComponent(
+      JSON.stringify({
+        ...initialState,
+        settings: { ...initialState.settings, hasLunaKey: true, lunaFallback: true },
+        turns: [{ question: '', answer: 'Luna answer', status: 'complete', lunaFallback: true }]
+      })
+    )
+  );
+  expect(window.document.querySelector('#lunaKeyStatus')!.textContent).toContain(
+    'saved in Keychain'
+  );
+  expect(window.document.querySelector('.turn-status')!.textContent).toBe('GPT-6 Luna fallback');
+  expect(window.document.querySelector('.turn-status')!.hasAttribute('hidden')).toBe(false);
 
   wordProvider.value = 'microsoft';
   wordProvider.dispatchEvent(new window.Event('change', { bubbles: true }) as unknown as Event);

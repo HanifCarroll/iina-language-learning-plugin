@@ -31,6 +31,7 @@ export type Turn = {
   answer: string;
   status: 'streaming' | 'complete' | 'incomplete' | 'failed';
   error?: string;
+  lunaFallback?: boolean;
 };
 export type Message = {
   role: 'system' | 'user' | 'assistant';
@@ -117,6 +118,7 @@ export class Conversation {
     this.turns[index].answer = '';
     this.turns[index].status = 'streaming';
     delete this.turns[index].error;
+    delete this.turns[index].lunaFallback;
 
     return { owner, messages };
   }
@@ -214,6 +216,12 @@ export class Conversation {
     turn.answer += text;
 
     return true;
+  }
+
+  setFallback(owner: RequestOwner, enabled: boolean): void {
+    if (this.accepts(owner)) {
+      this.turns.at(-1)!.lunaFallback = enabled;
+    }
   }
 
   complete(owner: RequestOwner): boolean {

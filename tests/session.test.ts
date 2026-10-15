@@ -1,6 +1,7 @@
-import { test, expect } from 'bun:test';
+import { test, expect, spyOn } from 'bun:test';
 import { Session } from '../src/main';
 import { IinaHost, type RawIina } from '../src/iina-host';
+import { LUNA_ENDPOINT, LUNA_MODEL } from '../src/fallback';
 
 const source =
   '1\n00:00:00,000 --> 00:00:02,000\nBen öyle bir insan mıyım?\n\n2\n00:00:04,000 --> 00:00:06,000\nNext cue';
@@ -1575,4 +1576,297 @@ test('new selection invalidates the prior request and keeps its own selected phr
   expect(player.writes.some((value) => value.endsWith('/control:STOP\n'))).toBe(true);
 
   player.close();
+});
+
+function fallbackPlayer(endpoint = 'https://api.deepseek.com', enabled = true) {
+  // 1. Keep distinct synthetic keys in an in-memory Keychain double.
+  const player = fakePlayer();
+  const keys = new Map<string, string>();
+  player.raw.utils.keychainRead = (service) => keys.get(service) ?? false;
+  player.raw.utils.keychainWrite = (service, _name, value) => {
+    keys.set(service, value);
+
+    return true;
+  };
+
+  // 2. Configure fallback through the public settings bridge.
+  player.sidebar.get('saveSettings')!({
+    endpoint,
+    model: 'deepseek-flash',
+    sourceLanguage: 'Turkish',
+    explanationLanguage: 'English',
+    includeSecondary: true,
+    noKeyRequired: false,
+    lunaFallback: enabled,
+    key: 'synthetic-primary-key',
+    lunaKey: 'synthetic-openai-key'
+  });
+
+  return { ...player, keys };
+}
+
+function sentPayloads(player: ReturnType<typeof fakePlayer>) {
+  return player.writes
+    .filter((value) => value.includes('/request:'))
+    .map((value) => JSON.parse(value.slice(value.indexOf('/request:') + 9)));
+}
+
+test('five-second fallback cancels DeepSeek, preserves context, isolates keys, and rejects late output', () => {
+  const clock = spyOn(Date, 'now').mockReturnValue(10_000);
+  const player = fallbackPlayer();
+  try {
+    // 1. Send DeepSeek and verify the exact five-second boundary.
+    select(player);
+    player.frames[0]('READY\n');
+    player.tick();
+    clock.mockReturnValue(14_999);
+    player.tick();
+    expect(player.frames).toHaveLength(1);
+    clock.mockReturnValue(15_000);
+    player.tick();
+    expect(player.frames).toHaveLength(2);
+    expect(player.writes.some((value) => value.endsWith('/control:STOP\n'))).toBe(true);
+    expect(player.states.at(-1).status).toContain('Using GPT-6 Luna');
+
+    // 2. Verify identical context and endpoint-specific authentication.
+    player.frames[1]('READY\n');
+    player.tick();
+    const [primary, fallback] = sentPayloads(player);
+    expect(primary.key).toBe('synthetic-primary-key');
+    expect(fallback.key).toBe('synthetic-openai-key');
+    expect(fallback.url).toBe(`${LUNA_ENDPOINT}/chat/completions`);
+    expect(fallback.body.model).toBe(LUNA_MODEL);
+    expect(fallback.body.messages).toEqual(primary.body.messages);
+    expect(fallback.body.thinking).toBeUndefined();
+    expect(fallback.body.reasoning_effort).toBe('none');
+    expect(fallback.body.store).toBe(false);
+
+    // 3. Accept only Luna output and retain its attribution after completion.
+    player.frames[0]('DELTA U1RBTEU=\nDONE\nERROR http_503\n');
+    player.frames[1]('DELTA THVuYQ==\nDONE\n');
+    player.tick();
+    const turn = player.states.at(-1).turns[0];
+    expect(turn.answer).toBe('Luna');
+    expect(turn.status).toBe('complete');
+    expect(turn.lunaFallback).toBe(true);
+    expect(player.states.at(-1).status).toContain('GPT-6 Luna');
+    expect(JSON.stringify(player.states)).not.toContain('synthetic-openai-key');
+    expect(JSON.stringify(player.states)).not.toContain('synthetic-primary-key');
+    clock.mockReturnValue(100_000);
+    player.tick();
+    expect(player.frames).toHaveLength(2);
+  } finally {
+    player.close();
+    clock.mockRestore();
+  }
+});
+
+test('DeepSeek failures before any text still fall back at five seconds', () => {
+  const clock = spyOn(Date, 'now').mockReturnValue(10_000);
+  const player = fallbackPlayer();
+  try {
+    select(player);
+    player.frames[0]('READY\nERROR http_503\n');
+    player.tick();
+    expect(player.states.at(-1).turns[0].status).toBe('streaming');
+    clock.mockReturnValue(14_999);
+    player.tick();
+    expect(player.frames).toHaveLength(1);
+    clock.mockReturnValue(15_000);
+    player.tick();
+    expect(player.frames).toHaveLength(2);
+
+    player.frames[1]('READY\nERROR http_429\n');
+    player.tick();
+    expect(player.states.at(-1).turns[0].status).toBe('failed');
+    expect(player.states.at(-1).turns[0].error).toBe('http_429');
+    clock.mockReturnValue(100_000);
+    player.tick();
+    expect(player.frames).toHaveLength(2);
+  } finally {
+    player.close();
+    clock.mockRestore();
+  }
+});
+
+test('DeepSeek answer text prevents fallback and partial errors remain incomplete', () => {
+  const clock = spyOn(Date, 'now').mockReturnValue(10_000);
+  const player = fallbackPlayer();
+  try {
+    select(player);
+    player.frames[0]('READY\nDELTA SGVsbG8=\n');
+    clock.mockReturnValue(15_000);
+    player.tick();
+    expect(player.frames).toHaveLength(1);
+    player.frames[0]('ERROR idle_timeout\n');
+    player.tick();
+    expect(player.states.at(-1).turns[0].status).toBe('incomplete');
+    clock.mockReturnValue(100_000);
+    player.tick();
+    expect(player.frames).toHaveLength(1);
+  } finally {
+    player.close();
+    clock.mockRestore();
+  }
+});
+
+test('completed DeepSeek answers do not start a fallback', () => {
+  const clock = spyOn(Date, 'now').mockReturnValue(10_000);
+  const player = fallbackPlayer();
+  try {
+    select(player);
+    player.frames[0]('READY\nDELTA SGVsbG8=\nDONE\n');
+    player.tick();
+    clock.mockReturnValue(100_000);
+    player.tick();
+    expect(player.frames).toHaveLength(1);
+    expect(player.states.at(-1).turns[0].status).toBe('complete');
+  } finally {
+    player.close();
+    clock.mockRestore();
+  }
+});
+
+for (const action of [
+  'stop',
+  'close',
+  'disableOverlay',
+  'media',
+  'track',
+  'teardown',
+  'settings'
+]) {
+  test(`${action} prevents a pending fallback, including after a DeepSeek error`, () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(10_000);
+    const player = fallbackPlayer();
+    try {
+      select(player);
+      player.frames[0]('READY\nERROR http_503\n');
+      player.tick();
+      if (action === 'media') {
+        player.status.url = 'file:///replacement.mp4';
+      } else if (action === 'track') {
+        player.raw.core.subtitle.id = 0;
+      } else if (action === 'teardown') {
+        player.close();
+      } else if (action === 'settings') {
+        player.sidebar.get('saveSettings')!({
+          ...player.states.at(-1).settings,
+          lunaFallback: false
+        });
+      } else {
+        player.sidebar.get(action)!({});
+      }
+      clock.mockReturnValue(100_000);
+      player.tick();
+      player.frames[0]('DELTA U1RBTEU=\nDONE\n');
+      player.tick();
+      expect(player.frames).toHaveLength(1);
+    } finally {
+      player.close();
+      clock.mockRestore();
+    }
+  });
+}
+
+test('fallback never activates for another endpoint or when switched off', () => {
+  const clock = spyOn(Date, 'now').mockReturnValue(10_000);
+  try {
+    for (const [endpoint, enabled] of [
+      ['https://api.deepseek.com', false],
+      ['https://api.deepseek.com.attacker.example', true],
+      ['http://127.0.0.1:47891', true]
+    ] as const) {
+      const player = fallbackPlayer(endpoint, enabled);
+      try {
+        select(player);
+        player.frames[0]('READY\n');
+        player.tick();
+        clock.mockReturnValue(100_000);
+        player.tick();
+        expect(player.frames).toHaveLength(1);
+        clock.mockReturnValue(10_000);
+      } finally {
+        player.close();
+      }
+    }
+  } finally {
+    clock.mockRestore();
+  }
+});
+
+test('missing OpenAI key fails visibly without borrowing the DeepSeek key or sending Luna', () => {
+  const clock = spyOn(Date, 'now').mockReturnValue(10_000);
+  const player = fallbackPlayer();
+  try {
+    select(player);
+    player.frames[0]('READY\n');
+    player.tick();
+    player.keys.delete(`api:${LUNA_ENDPOINT}`);
+    clock.mockReturnValue(15_000);
+    player.tick();
+    expect(player.frames).toHaveLength(1);
+    expect(player.states.at(-1).turns[0].status).toBe('failed');
+    expect(player.states.at(-1).status).toContain('Save an OpenAI key');
+  } finally {
+    player.close();
+    clock.mockRestore();
+  }
+});
+
+test('fallback can be stopped before READY without sending its key and follow-ups keep completed context', () => {
+  const clock = spyOn(Date, 'now').mockReturnValue(10_000);
+  const player = fallbackPlayer();
+  try {
+    select(player);
+    clock.mockReturnValue(15_000);
+    player.tick();
+    player.sidebar.get('stop')!({});
+    player.frames[0]('READY\n');
+    player.frames[1]('READY\n');
+    player.tick();
+    expect(sentPayloads(player)).toEqual([{}, {}]);
+
+    player.sidebar.get('retry')!({});
+    player.frames[2]('READY\nDELTA SGVsbG8=\nDONE\n');
+    player.tick();
+    player.sidebar.get('followUp')!({ question: 'Why?' });
+    player.frames[3]('READY\n');
+    player.tick();
+    clock.mockReturnValue(20_000);
+    player.tick();
+    player.frames[4]('READY\nDELTA THVuYQ==\nDONE\n');
+    player.tick();
+    const requests = sentPayloads(player);
+    expect(requests.at(-1).body.messages).toEqual(requests.at(-2).body.messages);
+    expect(requests.at(-1).body.messages.at(-2)).toEqual({ role: 'assistant', content: 'Hello' });
+    expect(requests.at(-1).body.messages.at(-1)).toEqual({ role: 'user', content: 'Why?' });
+    expect(player.states.at(-1).turns).toHaveLength(2);
+  } finally {
+    player.close();
+    clock.mockRestore();
+  }
+});
+
+test('fallback Keychain save failures and missing keys do not enable fallback or persist secrets', () => {
+  const preferences = new Map<string, unknown>();
+  const player = fakePlayer(false, preferences);
+  try {
+    const settings = {
+      ...player.states.at(-1).settings,
+      lunaFallback: true,
+      lunaKey: ''
+    };
+    player.sidebar.get('saveSettings')!(settings);
+    expect(player.states.at(-1).status).toContain('Save an OpenAI key');
+    expect(player.states.at(-1).settings.lunaFallback).toBe(false);
+    player.raw.utils.keychainWrite = () => false;
+    player.sidebar.get('saveSettings')!({ ...settings, lunaKey: 'synthetic-unsaved-key' });
+    expect(player.states.at(-1).status).toContain('Keychain could not save');
+    expect(JSON.stringify([...preferences])).not.toContain('synthetic-unsaved-key');
+    expect(JSON.stringify(player.states)).not.toContain('synthetic-unsaved-key');
+    expect(player.frames).toHaveLength(0);
+  } finally {
+    player.close();
+  }
 });
