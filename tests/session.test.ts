@@ -1328,7 +1328,7 @@ test('late Stop cannot relabel a completed answer', () => {
   player.sidebar.get('stop')!({});
 
   expect(player.states.at(-1).turns[0].status).toBe('complete');
-  expect(player.states.at(-1).status).toBe('Complete');
+  expect(player.states.at(-1).status).toBe('Complete · synthetic');
 
   player.close();
 });
@@ -1578,7 +1578,11 @@ test('new selection invalidates the prior request and keeps its own selected phr
   player.close();
 });
 
-function fallbackPlayer(endpoint = 'https://api.deepseek.com', enabled = true) {
+function fallbackPlayer(
+  endpoint = 'https://api.deepseek.com',
+  enabled = true,
+  primaryProvider: 'configured' | 'luna' = 'configured'
+) {
   // 1. Keep distinct synthetic keys in an in-memory Keychain double.
   const player = fakePlayer();
   const keys = new Map<string, string>();
@@ -1597,7 +1601,8 @@ function fallbackPlayer(endpoint = 'https://api.deepseek.com', enabled = true) {
     explanationLanguage: 'English',
     includeSecondary: true,
     noKeyRequired: false,
-    lunaFallback: enabled,
+    fallbackEnabled: enabled,
+    primaryProvider,
     key: 'synthetic-primary-key',
     lunaKey: 'synthetic-openai-key'
   });
@@ -1648,7 +1653,8 @@ test('five-second fallback cancels DeepSeek, preserves context, isolates keys, a
     const turn = player.states.at(-1).turns[0];
     expect(turn.answer).toBe('Luna');
     expect(turn.status).toBe('complete');
-    expect(turn.lunaFallback).toBe(true);
+    expect(turn.isFallback).toBe(true);
+    expect(turn.provider).toBe('GPT-6 Luna');
     expect(player.states.at(-1).status).toContain('GPT-6 Luna');
     expect(JSON.stringify(player.states)).not.toContain('synthetic-openai-key');
     expect(JSON.stringify(player.states)).not.toContain('synthetic-primary-key');
@@ -1752,7 +1758,7 @@ for (const action of [
       } else if (action === 'settings') {
         player.sidebar.get('saveSettings')!({
           ...player.states.at(-1).settings,
-          lunaFallback: false
+          fallbackEnabled: false
         });
       } else {
         player.sidebar.get(action)!({});
@@ -1769,15 +1775,11 @@ for (const action of [
   });
 }
 
-test('fallback never activates for another endpoint or when switched off', () => {
+test('fallback never activates when switched off, for either primary', () => {
   const clock = spyOn(Date, 'now').mockReturnValue(10_000);
   try {
-    for (const [endpoint, enabled] of [
-      ['https://api.deepseek.com', false],
-      ['https://api.deepseek.com.attacker.example', true],
-      ['http://127.0.0.1:47891', true]
-    ] as const) {
-      const player = fallbackPlayer(endpoint, enabled);
+    for (const primary of ['configured', 'luna'] as const) {
+      const player = fallbackPlayer('https://api.deepseek.com', false, primary);
       try {
         select(player);
         player.frames[0]('READY\n');
@@ -1791,6 +1793,161 @@ test('fallback never activates for another endpoint or when switched off', () =>
       }
     }
   } finally {
+    clock.mockRestore();
+  }
+});
+
+test('Luna primary uses no thinking and falls back once to DeepSeek with its own key', () => {
+  const clock = spyOn(Date, 'now').mockReturnValue(10_000);
+  const player = fallbackPlayer('https://api.deepseek.com', true, 'luna');
+  try {
+    // 1. Start Luna with its saved key and no-thinking request options.
+    select(player);
+    player.frames[0]('READY\n');
+    player.tick();
+    const primary = sentPayloads(player)[0];
+    expect(primary.url).toBe(`${LUNA_ENDPOINT}/chat/completions`);
+    expect(primary.key).toBe('synthetic-openai-key');
+    expect(primary.body.model).toBe(LUNA_MODEL);
+    expect(primary.body.reasoning_effort).toBe('none');
+    expect(primary.body.store).toBe(false);
+    expect(primary.body.thinking).toBeUndefined();
+
+    // 2. Enforce the same five-second boundary in the reverse direction.
+    clock.mockReturnValue(14_999);
+    player.tick();
+    expect(player.frames).toHaveLength(1);
+    clock.mockReturnValue(15_000);
+    player.tick();
+    expect(player.frames).toHaveLength(2);
+    expect(player.states.at(-1).status).toContain('Using DeepSeek');
+    player.frames[1]('READY\n');
+    player.tick();
+    const fallback = sentPayloads(player)[1];
+    expect(fallback.url).toBe('https://api.deepseek.com/chat/completions');
+    expect(fallback.key).toBe('synthetic-primary-key');
+    expect(fallback.body.model).toBe('deepseek-flash');
+    expect(fallback.body.messages).toEqual(primary.body.messages);
+    expect(fallback.body.thinking).toEqual({ type: 'disabled' });
+    expect(fallback.body.reasoning_effort).toBeUndefined();
+
+    // 3. Reject late Luna data and expose a failed fallback without another attempt.
+    player.frames[0]('DELTA U1RBTEU=\nDONE\n');
+    player.frames[1]('ERROR http_503\n');
+    player.tick();
+    expect(player.states.at(-1).turns[0]).toMatchObject({
+      provider: 'DeepSeek',
+      isFallback: true,
+      answer: '',
+      status: 'failed'
+    });
+    clock.mockReturnValue(100_000);
+    player.tick();
+    expect(player.frames).toHaveLength(2);
+    expect(JSON.stringify(player.states)).not.toContain('synthetic-openai-key');
+  } finally {
+    player.close();
+    clock.mockRestore();
+  }
+});
+
+test('a Luna answer stays primary and the next turn starts with Luna again', () => {
+  const clock = spyOn(Date, 'now').mockReturnValue(10_000);
+  const player = fallbackPlayer('https://api.deepseek.com', true, 'luna');
+  try {
+    select(player);
+    player.frames[0]('READY\nDELTA THVuYQ==\n');
+    player.tick();
+    clock.mockReturnValue(100_000);
+    player.tick();
+    expect(player.frames).toHaveLength(1);
+    player.frames[0]('DONE\n');
+    player.tick();
+    expect(player.states.at(-1).turns[0]).toMatchObject({
+      provider: 'GPT-6 Luna',
+      isFallback: false,
+      status: 'complete'
+    });
+    player.sidebar.get('followUp')!({ question: 'Why?' });
+    player.frames[1]('READY\n');
+    player.tick();
+    expect(sentPayloads(player)[1].body.model).toBe(LUNA_MODEL);
+    expect(sentPayloads(player)[1].body.reasoning_effort).toBe('none');
+  } finally {
+    player.close();
+    clock.mockRestore();
+  }
+});
+
+test('configured providers beyond DeepSeek use the same fallback policy', () => {
+  const clock = spyOn(Date, 'now').mockReturnValue(10_000);
+  const player = fallbackPlayer('http://127.0.0.1:47891');
+  try {
+    select(player);
+    player.frames[0]('READY\n');
+    player.tick();
+    clock.mockReturnValue(15_000);
+    player.tick();
+    player.frames[1]('READY\n');
+    player.tick();
+    expect(sentPayloads(player)[1].body.model).toBe(LUNA_MODEL);
+    expect(sentPayloads(player)[1].body.messages).toEqual(sentPayloads(player)[0].body.messages);
+  } finally {
+    player.close();
+    clock.mockRestore();
+  }
+});
+
+test('legacy settings migrate enabled Luna fallback without changing endpoint or exposing keys', () => {
+  const preferences = new Map<string, unknown>([
+    [
+      'settings',
+      {
+        endpoint: 'https://api.deepseek.com/v1',
+        model: 'deepseek-flash',
+        lunaFallback: true
+      }
+    ]
+  ]);
+  const player = fakePlayer(false, preferences);
+  try {
+    expect(player.states.at(-1).settings).toMatchObject({
+      endpoint: 'https://api.deepseek.com/v1',
+      model: 'deepseek-flash',
+      fallbackEnabled: true,
+      primaryProvider: 'configured'
+    });
+    expect(player.states.at(-1).settings).not.toHaveProperty('lunaFallback');
+    expect(player.frames).toHaveLength(0);
+  } finally {
+    player.close();
+  }
+});
+
+test('changing provider order cancels pending work and preserves endpoint-bound keys', () => {
+  const clock = spyOn(Date, 'now').mockReturnValue(10_000);
+  const player = fallbackPlayer('https://api.deepseek.com', true, 'luna');
+  try {
+    select(player);
+    player.frames[0]('READY\n');
+    player.tick();
+    const settings = player.states.at(-1).settings;
+    player.sidebar.get('saveSettings')!({ ...settings, primaryProvider: 'configured' });
+    expect(player.states.at(-1).status).toBe('Settings saved. No request was sent.');
+    expect(player.states.at(-1).settings).toMatchObject({
+      primaryProvider: 'configured',
+      hasSavedKey: true,
+      hasLunaKey: true
+    });
+    player.frames[0]('DELTA U1RBTEU=\nDONE\n');
+    clock.mockReturnValue(100_000);
+    player.tick();
+    expect(player.frames).toHaveLength(1);
+    player.sidebar.get('saveSettings')!({ ...settings, primaryProvider: 'forged' });
+    expect(player.states.at(-1).status).toBe('Choose a primary provider');
+    expect(player.states.at(-1).settings.primaryProvider).toBe('configured');
+  } finally {
+    player.close();
     clock.mockRestore();
   }
 });
@@ -1854,12 +2011,12 @@ test('fallback Keychain save failures and missing keys do not enable fallback or
   try {
     const settings = {
       ...player.states.at(-1).settings,
-      lunaFallback: true,
+      fallbackEnabled: true,
       lunaKey: ''
     };
     player.sidebar.get('saveSettings')!(settings);
     expect(player.states.at(-1).status).toContain('Save an OpenAI key');
-    expect(player.states.at(-1).settings.lunaFallback).toBe(false);
+    expect(player.states.at(-1).settings.fallbackEnabled).toBe(false);
     player.raw.utils.keychainWrite = () => false;
     player.sidebar.get('saveSettings')!({ ...settings, lunaKey: 'synthetic-unsaved-key' });
     expect(player.states.at(-1).status).toContain('Keychain could not save');

@@ -2,7 +2,14 @@ import { canonicalEndpoint, Credentials } from './credentials';
 import { Conversation, type ContextSnapshot, type RequestOwner } from './conversation';
 import { IinaHost, type RawIina } from './iina-host';
 import { NativeStream, type StreamRecord } from './stream';
-import { FallbackDeadline, isDeepSeekEndpoint, LUNA_ENDPOINT, LUNA_MODEL } from './fallback';
+import {
+  FallbackDeadline,
+  isDeepSeekEndpoint,
+  LUNA_ENDPOINT,
+  otherProvider,
+  providerConnection,
+  type ProviderChoice
+} from './fallback';
 import { contextForCue, cueForDisplay, parseSubtitles, type Cue } from './subtitles';
 import type { PendingSelection } from './selection';
 import { languageCode, parseWordResponse, wordAt, type WordProvider } from './word-lookup';
@@ -17,7 +24,8 @@ type Settings = {
   explanationLanguage: string;
   includeSecondary: boolean;
   noKeyRequired: boolean;
-  lunaFallback: boolean;
+  fallbackEnabled: boolean;
+  primaryProvider: ProviderChoice;
   secondaryBelowSource: boolean;
   appearance: Appearance;
   wordProvider: WordProvider;
@@ -63,7 +71,8 @@ const DEFAULTS: Settings = {
   explanationLanguage: 'English',
   includeSecondary: true,
   noKeyRequired: false,
-  lunaFallback: false,
+  fallbackEnabled: false,
+  primaryProvider: 'configured',
   secondaryBelowSource: false,
   appearance: DEFAULT_APPEARANCE,
   wordProvider: 'off',
@@ -158,7 +167,8 @@ function validSettings(value: unknown): Settings {
     explanationLanguage,
     includeSecondary: data.includeSecondary,
     noKeyRequired: data.noKeyRequired,
-    lunaFallback: data.lunaFallback === true,
+    fallbackEnabled: data.fallbackEnabled === true,
+    primaryProvider: data.primaryProvider === 'luna' ? 'luna' : 'configured',
     secondaryBelowSource: data.secondaryBelowSource === true,
     appearance: validAppearance(data.appearance),
     wordProvider: ['google', 'microsoft'].includes(String(data.wordProvider))
@@ -207,7 +217,9 @@ export class Session {
     owner: RequestOwner;
     stream: NativeStream;
     messages: unknown;
-    provider: 'primary' | 'luna';
+    provider: ProviderChoice;
+    label: string;
+    isFallback: boolean;
     fallback: FallbackDeadline | null;
     waitingAfterError: boolean;
   } | null = null;
@@ -256,7 +268,11 @@ export class Session {
 
     // 2. Normalize legacy appearance settings and check endpoint-bound credentials.
     this.settings.secondaryBelowSource = this.settings.secondaryBelowSource === true;
-    this.settings.lunaFallback = this.settings.lunaFallback === true;
+    const legacy = stored as { fallbackEnabled?: unknown; lunaFallback?: unknown } | null;
+    this.settings.fallbackEnabled = (legacy?.fallbackEnabled ?? legacy?.lunaFallback) === true;
+    this.settings.primaryProvider =
+      this.settings.primaryProvider === 'luna' ? 'luna' : 'configured';
+    delete (this.settings as Settings & { lunaFallback?: unknown }).lunaFallback;
     if (!['off', 'google', 'microsoft'].includes(this.settings.wordProvider)) {
       this.settings.wordProvider = 'off';
     }
@@ -1264,10 +1280,7 @@ export class Session {
     }
   }
 
-  private launch(
-    request: { owner: RequestOwner; messages: unknown },
-    provider: 'primary' | 'luna' = 'primary'
-  ): void {
+  private launch(request: { owner: RequestOwner; messages: unknown }, isFallback = false): void {
     // 1. Validate the configured endpoint and read its key in privileged code.
     const conversation = this.conversation;
     if (!conversation) {
@@ -1275,11 +1288,12 @@ export class Session {
     }
 
     try {
-      const endpoint = canonicalEndpoint(
-        provider === 'luna' ? LUNA_ENDPOINT : this.settings.endpoint
-      );
-      const model = provider === 'luna' ? LUNA_MODEL : this.settings.model;
-      const noKeyRequired = provider === 'primary' && this.settings.noKeyRequired;
+      const provider = isFallback
+        ? otherProvider(this.settings.primaryProvider)
+        : this.settings.primaryProvider;
+      const connection = providerConnection(this.settings, provider);
+      const { model, noKeyRequired, label } = connection;
+      const endpoint = canonicalEndpoint(connection.endpoint);
       if (!model) {
         throw new Error('Set an API model in Settings');
       }
@@ -1288,7 +1302,7 @@ export class Session {
       if (!noKeyRequired && !key) {
         throw new Error(
           provider === 'luna'
-            ? 'Save an OpenAI key in AI settings to use the GPT-6 Luna fallback.'
+            ? 'Save an OpenAI key in AI settings to use GPT-6 Luna.'
             : 'Save an API key for this endpoint in Settings'
         );
       }
@@ -1324,18 +1338,17 @@ export class Session {
         stream,
         messages: request.messages,
         provider,
+        label,
+        isFallback,
         waitingAfterError: false,
         fallback:
-          provider === 'primary' && this.settings.lunaFallback && isDeepSeekEndpoint(endpoint.base)
-            ? new FallbackDeadline(Date.now())
-            : null
+          !isFallback && this.settings.fallbackEnabled ? new FallbackDeadline(Date.now()) : null
       };
-      conversation.setFallback(request.owner, provider === 'luna');
+      conversation.setProvider(request.owner, label, isFallback);
       stream.start();
-      this.status =
-        provider === 'luna'
-          ? 'DeepSeek did not answer within 5 seconds. Using GPT-6 Luna…'
-          : 'Generating…';
+      this.status = isFallback
+        ? `Primary did not answer within 5 seconds. Using ${label}…`
+        : `Generating · ${label}…`;
     } catch (error) {
       conversation.fail(
         request.owner,
@@ -1362,11 +1375,11 @@ export class Session {
       }
     } else if (record.kind === 'done') {
       this.conversation.complete(owner);
-      this.status = this.active.provider === 'luna' ? 'Complete · GPT-6 Luna fallback' : 'Complete';
+      this.status = `Complete · ${this.active.label}${this.active.isFallback ? ' fallback' : ''}`;
     } else if (record.kind === 'error') {
       if (this.active.fallback?.isWaiting()) {
         this.active.waitingAfterError = true;
-        this.status = 'DeepSeek request failed. Waiting for the 5-second GPT-6 Luna fallback…';
+        this.status = `${this.active.label} request failed. Waiting for the 5-second fallback…`;
         this.render();
 
         return;
@@ -1382,15 +1395,15 @@ export class Session {
   }
 
   private checkFallback(): void {
-    // 1. Require a live, unanswered DeepSeek attempt owned by this conversation.
+    // 1. Require a live, unanswered primary attempt owned by this conversation.
     const active = this.active;
     if (!active?.fallback?.isDue(Date.now()) || !this.conversation?.accepts(active.owner)) {
       return;
     }
 
-    // 2. Retire DeepSeek before launching one Luna attempt with identical context.
+    // 2. Retire the primary before launching the other provider with identical context.
     this.cancelRequest();
-    this.launch({ owner: active.owner, messages: active.messages }, 'luna');
+    this.launch({ owner: active.owner, messages: active.messages }, true);
   }
 
   private sameOwner(current: RequestOwner, incoming: RequestOwner): boolean {
@@ -1558,8 +1571,14 @@ export class Session {
       if (lunaKey !== '' && lunaKey !== undefined && typeof lunaKey !== 'string') {
         throw new Error('Invalid OpenAI API key');
       }
-      if (data.lunaFallback !== undefined && typeof data.lunaFallback !== 'boolean') {
+      if (data.fallbackEnabled !== undefined && typeof data.fallbackEnabled !== 'boolean') {
         throw new Error('Invalid fallback setting');
+      }
+      if (
+        data.primaryProvider !== undefined &&
+        !['configured', 'luna'].includes(String(data.primaryProvider))
+      ) {
+        throw new Error('Choose a primary provider');
       }
       if (!['off', 'google', 'microsoft'].includes(String(provider))) {
         throw new Error('Choose a word lookup provider');
@@ -1580,7 +1599,8 @@ export class Session {
 
       const next = validSettings({
         ...data,
-        lunaFallback: data.lunaFallback ?? this.settings.lunaFallback,
+        fallbackEnabled: data.fallbackEnabled ?? this.settings.fallbackEnabled,
+        primaryProvider: data.primaryProvider ?? this.settings.primaryProvider,
         appearance: this.settings.appearance,
         secondaryBelowSource: this.settings.secondaryBelowSource,
         wordProvider: provider,
@@ -1601,8 +1621,14 @@ export class Session {
       if (lunaKey !== '' && lunaKey !== undefined) {
         this.credentials.save(LUNA_ENDPOINT, lunaKey as string);
       }
-      if (next.lunaFallback && !this.credentials.hasSavedKey(LUNA_ENDPOINT)) {
-        throw new Error('Save an OpenAI key before enabling GPT-6 Luna fallback.');
+      if (
+        (next.fallbackEnabled || next.primaryProvider === 'luna') &&
+        !this.credentials.hasSavedKey(LUNA_ENDPOINT)
+      ) {
+        throw new Error('Save an OpenAI key before using GPT-6 Luna.');
+      }
+      if (next.fallbackEnabled && (!next.endpoint || !next.model)) {
+        throw new Error('Configure the other provider before enabling fallback.');
       }
       if (wordKey !== '' && wordKey !== undefined && next.wordProvider !== 'off') {
         this.credentials.save(WORD_ENDPOINTS[next.wordProvider], wordKey as string);
@@ -1617,7 +1643,8 @@ export class Session {
           'explanationLanguage',
           'includeSecondary',
           'noKeyRequired',
-          'lunaFallback'
+          'fallbackEnabled',
+          'primaryProvider'
         ].some(
           (field) => next[field as keyof Settings] !== this.settings[field as keyof Settings]
         ) ||

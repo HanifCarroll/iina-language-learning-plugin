@@ -72,7 +72,7 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
       includeSecondary: true,
       noKeyRequired: false,
       hasSavedKey: false,
-      lunaFallback: false,
+      fallbackEnabled: false,
       hasLunaKey: false,
       wordProvider: 'off',
       wordRegion: '',
@@ -116,12 +116,33 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
 
   const key = window.document.querySelector('#apiKey') as unknown as HTMLInputElement;
   const lunaKey = window.document.querySelector('#lunaKey') as unknown as HTMLInputElement;
-  const lunaFallback = window.document.querySelector(
-    '#lunaFallback'
+  const fallbackEnabled = window.document.querySelector(
+    '#fallbackEnabled'
   ) as unknown as HTMLInputElement;
+  const primaryProvider = window.document.querySelector(
+    '#primaryProvider'
+  ) as unknown as HTMLSelectElement;
+  const fallbackProvider = window.document.querySelector(
+    '#fallbackProvider'
+  ) as unknown as HTMLSelectElement;
+
+  // 3. Swapping either selector keeps the providers distinct and preserves the draft.
+  primaryProvider.value = 'luna';
+  primaryProvider.dispatchEvent(new window.Event('change', { bubbles: true }) as unknown as Event);
+  expect(fallbackProvider.value).toBe('configured');
+  handlers.get('state')!(encodeURIComponent(JSON.stringify(initialState)));
+  expect(primaryProvider.value).toBe('luna');
+  expect(fallbackProvider.value).toBe('configured');
+  fallbackProvider.value = 'luna';
+  fallbackProvider.dispatchEvent(new window.Event('change', { bubbles: true }) as unknown as Event);
+  expect(primaryProvider.value).toBe('configured');
+  fallbackProvider.value = 'configured';
+  fallbackProvider.dispatchEvent(new window.Event('change', { bubbles: true }) as unknown as Event);
+  expect(primaryProvider.value).toBe('luna');
+
   key.value = 'new-fixture-value';
   lunaKey.value = 'synthetic-openai-key';
-  lunaFallback.checked = true;
+  fallbackEnabled.checked = true;
   wordKey.value = 'synthetic-word-key';
   (window.document.querySelector('#saveSettings') as unknown as HTMLButtonElement).click();
 
@@ -131,7 +152,9 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
   expect(sent.at(-1)?.name).toBe('saveSettings');
   expect(sent.at(-1)?.data.key).toBe('new-fixture-value');
   expect(sent.at(-1)?.data.lunaKey).toBe('synthetic-openai-key');
-  expect(sent.at(-1)?.data.lunaFallback).toBe(true);
+  expect(sent.at(-1)?.data.fallbackEnabled).toBe(true);
+  expect(sent.at(-1)?.data.primaryProvider).toBe('luna');
+  expect(sent.at(-1)?.data).not.toHaveProperty('fallbackProvider');
   expect(sent.at(-1)?.data.wordProvider).toBe('google');
   expect(sent.at(-1)?.data.wordKey).toBe('synthetic-word-key');
   expect(window.document.body.textContent).not.toContain('new-fixture-value');
@@ -142,8 +165,16 @@ test('sidebar renders untrusted text safely and clears newly typed key after sav
     encodeURIComponent(
       JSON.stringify({
         ...initialState,
-        settings: { ...initialState.settings, hasLunaKey: true, lunaFallback: true },
-        turns: [{ question: '', answer: 'Luna answer', status: 'complete', lunaFallback: true }]
+        settings: { ...initialState.settings, hasLunaKey: true, fallbackEnabled: true },
+        turns: [
+          {
+            question: '',
+            answer: 'Luna answer',
+            status: 'complete',
+            provider: 'GPT-6 Luna',
+            isFallback: true
+          }
+        ]
       })
     )
   );

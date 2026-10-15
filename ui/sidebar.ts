@@ -28,7 +28,8 @@ type ViewState = {
     answer: string;
     status: string;
     error?: string;
-    lunaFallback?: boolean;
+    provider?: string;
+    isFallback?: boolean;
   }>;
   settings: {
     endpoint: string;
@@ -37,7 +38,8 @@ type ViewState = {
     explanationLanguage: string;
     includeSecondary: boolean;
     noKeyRequired: boolean;
-    lunaFallback: boolean;
+    fallbackEnabled: boolean;
+    primaryProvider: 'configured' | 'luna';
     hasLunaKey: boolean;
     secondaryBelowSource: boolean;
     hasSavedKey: boolean;
@@ -287,12 +289,13 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       } else {
         turnStatus.textContent = turn.status;
       }
-      if (turn.lunaFallback) {
-        turnStatus.textContent = ['GPT-6 Luna fallback', turnStatus.textContent]
+      if (turn.provider) {
+        const providerLabel = `${turn.provider}${turn.isFallback ? ' fallback' : ''}`;
+        turnStatus.textContent = [providerLabel, turnStatus.textContent]
           .filter(Boolean)
           .join(' · ');
       }
-      turnStatus.hidden = turn.status === 'complete' && !turn.lunaFallback;
+      turnStatus.hidden = turn.status === 'complete' && !turn.provider;
     });
 
     // 2. Remove obsolete turns and scroll only for a newly submitted question.
@@ -319,7 +322,11 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       }
       element<HTMLInputElement>('includeSecondary').checked = state.settings.includeSecondary;
       element<HTMLInputElement>('noKeyRequired').checked = state.settings.noKeyRequired;
-      element<HTMLInputElement>('lunaFallback').checked = state.settings.lunaFallback === true;
+      element<HTMLInputElement>('fallbackEnabled').checked =
+        state.settings.fallbackEnabled === true;
+      element<HTMLSelectElement>('primaryProvider').value =
+        state.settings.primaryProvider ?? 'configured';
+      syncProviderOrder();
       element<HTMLSelectElement>('wordProvider').value = state.settings.wordProvider;
       element<HTMLInputElement>('wordRegion').value = state.settings.wordRegion;
     }
@@ -343,10 +350,32 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       : 'No key is saved for this endpoint.';
     element('lunaKeyStatus').textContent = state.settings.hasLunaKey
       ? 'An OpenAI key is saved in Keychain.'
-      : 'Save an OpenAI key to enable fallback.';
+      : 'Save an OpenAI key to use GPT-6 Luna.';
     element('requestUrl').textContent = state.settings.requestUrl
       ? `Requests go to ${state.settings.requestUrl}`
       : '';
+  }
+
+  function syncProviderOrder(changed: 'primary' | 'fallback' = 'primary'): void {
+    // 1. Keep both selectors complementary while allowing either one to drive a swap.
+    const primary = element<HTMLSelectElement>('primaryProvider');
+    const fallback = element<HTMLSelectElement>('fallbackProvider');
+    if (changed === 'fallback') {
+      primary.value = fallback.value === 'luna' ? 'configured' : 'luna';
+    } else {
+      fallback.value = primary.value === 'luna' ? 'configured' : 'luna';
+    }
+
+    // 2. Label the configured connection from the current editable model.
+    const model = element<HTMLInputElement>('model').value.trim();
+    const endpoint = element<HTMLInputElement>('endpoint').value.trim();
+    let label = model || 'Configured provider';
+    if (/^https:\/\/api\.deepseek\.com(?:\/|$)/i.test(endpoint)) {
+      label = 'DeepSeek';
+    }
+    for (const select of [primary, fallback]) {
+      select.querySelector<HTMLOptionElement>('option[value="configured"]')!.textContent = label;
+    }
   }
 
   function renderWordControls(): void {
@@ -444,7 +473,8 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
       explanationLanguage: element<HTMLInputElement>('explanationLanguage').value,
       includeSecondary: element<HTMLInputElement>('includeSecondary').checked,
       noKeyRequired: element<HTMLInputElement>('noKeyRequired').checked,
-      lunaFallback: element<HTMLInputElement>('lunaFallback').checked,
+      fallbackEnabled: element<HTMLInputElement>('fallbackEnabled').checked,
+      primaryProvider: element<HTMLSelectElement>('primaryProvider').value,
       lunaKey: lunaKeyInput.value,
       key: keyInput.value,
       wordProvider: element<HTMLSelectElement>('wordProvider').value,
@@ -460,6 +490,11 @@ export function mountSidebar(doc: Document, bridge: Bridge): void {
     element<HTMLInputElement>('wordKey').value = '';
     renderWordControls();
   });
+  element('primaryProvider').addEventListener('change', () => syncProviderOrder('primary'));
+  element('fallbackProvider').addEventListener('change', () => syncProviderOrder('fallback'));
+  for (const id of ['endpoint', 'model']) {
+    element(id).addEventListener('input', () => syncProviderOrder());
+  }
   element('aiView').addEventListener('input', () => {
     aiDraftActive = true;
   });

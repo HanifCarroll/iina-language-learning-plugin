@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { FallbackDeadline, isDeepSeekEndpoint } from '../src/fallback';
+import { FallbackDeadline, isDeepSeekEndpoint, otherProvider } from '../src/fallback';
 
 test('fallback waits five seconds for answer text rather than stream keepalives', () => {
   const deadline = new FallbackDeadline(100);
@@ -14,7 +14,7 @@ test('the first answer disables fallback even if DeepSeek later stalls', () => {
   expect(deadline.isDue(100_000)).toBe(false);
 });
 
-test('only the official DeepSeek HTTPS host is eligible', () => {
+test('DeepSeek-specific options recognize only the official HTTPS host', () => {
   expect(isDeepSeekEndpoint('https://API.DeepSeek.com:443/v1/')).toBe(true);
   for (const endpoint of [
     'https://api.deepseek.com.attacker.example',
@@ -25,4 +25,9 @@ test('only the official DeepSeek HTTPS host is eligible', () => {
   ]) {
     expect(isDeepSeekEndpoint(endpoint)).toBe(false);
   }
+});
+
+test('the fallback is always the other provider', () => {
+  expect(otherProvider('luna')).toBe('configured');
+  expect(otherProvider('configured')).toBe('luna');
 });
